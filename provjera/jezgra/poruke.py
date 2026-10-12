@@ -56,6 +56,40 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Provjeri jesu li margine iste kao u PDF-u sa svojstvima. "
             "Ako nisu, upisao si krivi redni broj."
         ),
+        "ulaz.oznaka": "Učitaj svoj rad (.docx)",
+        "ulaz.prihvaceno": "Datoteka je prošla provjeru formata (Word dokument .docx).",
+        "ulaz.prazna": (
+            "Datoteka je prazna (0 bajtova). Spremi rad ponovno u Wordu i učitaj ga."
+        ),
+        "ulaz.neispravan_format": (
+            "Prihvaća se samo Word dokument (.docx). U Wordu odaberi "
+            "Spremi kao (Save As) → Word dokument (.docx)."
+        ),
+        "ulaz.stari_doc": (
+            "Ovo je stari Wordov format (.doc). Otvori datoteku u Wordu i odaberi "
+            "Spremi kao (Save As) → Word dokument (.docx)."
+        ),
+        "ulaz.makro": (
+            "Dokument s makronaredbama (.docm) nije dopušten. Odaberi "
+            "Spremi kao (Save As) → Word dokument (.docx)."
+        ),
+        "ulaz.sifrirana": (
+            "Datoteka je zaštićena lozinkom. Ukloni lozinku: Datoteka (File) → "
+            "Informacije (Info) → Zaštiti dokument (Protect Document) → "
+            "Šifriraj lozinkom (Encrypt with Password), obriši lozinku i spremi."
+        ),
+        "ulaz.prevelika": (
+            "Datoteka je veća od {mb} MB. Smanji slike: Oblikovanje slike "
+            "(Picture Format) → Komprimiraj slike (Compress Pictures), pa spremi ponovno."
+        ),
+        "ulaz.zip_bomba": (
+            "Sadržaj datoteke prevelik je za provjeru (više od {mb} MB nakon "
+            "raspakiranja). Smanji slike i spremi ponovno."
+        ),
+        "ulaz.ostecena": (
+            "Datoteka je oštećena ili nije ispravan Word dokument. Otvori je u Wordu, "
+            "provjeri sadržaj i ponovno je spremi kao Word dokument (.docx)."
+        ),
         "naziv.obrazac": (
             "Naziv datoteke: `{obrazac}`, s tvojim imenom i prezimenom "
             "kako su zapisani u ISVU-u."

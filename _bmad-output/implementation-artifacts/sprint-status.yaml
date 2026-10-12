@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-12-2026 18:00
-last_updated: 10-12-2026 20:30
+last_updated: 10-12-2026 21:45
 project: check_word_file
 project_key: NOKEY
 tracking_system: file-system
@@ -38,7 +38,7 @@ development_status:
   epic-1: in-progress
   1-1-postavljanje-projekta-i-objava-prazne-studentske-stranice: review
   1-2-student-upisuje-redni-broj-i-vidi-svoje-margine: review
-  1-3-sigurno-učitavanje-dokumenta: backlog
+  1-3-sigurno-učitavanje-dokumenta: review
   1-4-izvještaj-o-provjeri-i-pravilo-naziva-datoteke: backlog
   1-5-provjera-sekcija-margina-i-stranice: backlog
   1-6-preuzimanje-sažetka-provjere: backlog

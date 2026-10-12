@@ -150,6 +150,14 @@ def test_graf_uvoza_hvata_zabranjen_modul(tmp_path):
     assert "openpyxl" in ucitani_zabranjeni_moduli(skripta)
 
 
+def test_student_ne_koristi_predmemoriju():
+    # AD-10: dokument ne smije završiti u st.cache_*.
+    stablo = ast.parse((APPS / "student.py").read_text(encoding="utf-8"))
+    nazivi = {c.attr for c in ast.walk(stablo) if isinstance(c, ast.Attribute)}
+    nazivi |= {c.id for c in ast.walk(stablo) if isinstance(c, ast.Name)}
+    assert nazivi.isdisjoint({"cache_data", "cache_resource", "cache", "experimental_memo"})
+
+
 # --- AD-2: osobni podaci nisu u repozitoriju ---------------------------------
 
 

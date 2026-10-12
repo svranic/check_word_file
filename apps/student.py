@@ -4,18 +4,29 @@ from pathlib import Path
 
 import streamlit as st
 
-from provjera.jezgra import formula, profil, rbr
+from provjera.jezgra import formula, profil, rbr, ulaz
 from provjera.jezgra.jedinice import Jedinica, mm_u_twips
 from provjera.jezgra.poruke import formatiraj, poruka
 
 MAPA_PROFILA = Path(__file__).resolve().parents[1] / "profili"
 # Stanje vezano uz jednu provjeru; briše se pri promjeni Rbr. ili vježbe (FR-9).
-KLJUCEVI_PROVJERE = ("izvjestaj", "datoteka")
+KLJUCEVI_PROVJERE = ("izvjestaj", "rezultat_ulaza")
+PRIHVACENO = "prihvaceno"
+VELICINA_PO_RAZLOGU = {
+    ulaz.RazlogOdbijanja.PREVELIKA: ulaz.NAJVECA_VELICINA_MB,
+    ulaz.RazlogOdbijanja.ZIP_BOMBA: ulaz.NAJVECA_RASPAKIRANA_MB,
+}
+
+
+def novo_polje_za_ucitavanje() -> None:
+    """Novi ključ polja: Streamlit odbacuje prethodno učitanu datoteku (AD-10)."""
+    st.session_state["polje_ucitavanja"] = st.session_state.get("polje_ucitavanja", 0) + 1
 
 
 def ocisti_provjeru() -> None:
     for kljuc in KLJUCEVI_PROVJERE:
         st.session_state.pop(kljuc, None)
+    novo_polje_za_ucitavanje()
 
 
 def potvrdi_rbr() -> None:
@@ -41,6 +52,27 @@ def prikazi_margine(odabrani: profil.Profil, broj: int) -> None:
     )
     st.caption(poruka("margine.usporedi"))
     st.write(poruka("naziv.obrazac", obrazac=odabrani.naziv_datoteke.obrazac))
+
+
+def ucitaj_dokument() -> None:
+    datoteka = st.file_uploader(
+        poruka("ulaz.oznaka"),
+        key=f"datoteka_{st.session_state.get('polje_ucitavanja', 0)}",
+        # Malo iznad granice jezgre, da veću datoteku odbije jezgra s našom porukom.
+        max_upload_size=ulaz.NAJVECA_VELICINA_MB + 1,
+    )
+    if datoteka is not None:
+        razlog = ulaz.provjeri_ulaz(datoteka.name, datoteka.getvalue())
+        st.session_state["rezultat_ulaza"] = razlog.value if razlog else PRIHVACENO
+        novo_polje_za_ucitavanje()
+        st.rerun()
+
+    rezultat = st.session_state.get("rezultat_ulaza")
+    if rezultat == PRIHVACENO:
+        st.success(poruka("ulaz.prihvaceno"))
+    elif rezultat:
+        razlog = ulaz.RazlogOdbijanja(rezultat)
+        st.error(poruka(f"ulaz.{razlog}", mb=VELICINA_PO_RAZLOGU.get(razlog, 0)))
 
 
 st.set_page_config(page_title=poruka("app.naslov"), page_icon="📄")
@@ -81,3 +113,4 @@ elif broj is not None:
         st.error(poruka("rbr.prevelik", rbr=broj, najveci=najveci))
     else:
         prikazi_margine(odabrani, broj)
+        ucitaj_dokument()
