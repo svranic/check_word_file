@@ -26,6 +26,16 @@ sjeme = 20261012
 [tolerancije]
 # Mora biti manja od pola koraka formule.
 margine = "0,03 cm"
+# Dopušteno odstupanje veličine stranice (A4).
+stranica = "0,1 cm"
 
 [pravila.R-NAZIV]
 ukljuceno = true
+
+[pravila.R-SEKCIJE]
+ukljuceno = true
+
+[pravila.R-MARGINE]
+ukljuceno = true
+sirina_stranice = "21 cm"
+visina_stranice = "29,7 cm"

@@ -1,8 +1,7 @@
-import io
 from pathlib import Path
 
-import docx
 import pytest
+from alati.generator import ispravan
 
 from provjera.jezgra import profil
 from provjera.jezgra.jedinice import Jedinica
@@ -19,9 +18,8 @@ NAZIV = "Lucija_Šimek_GiG_OG_Vjezba_1.docx"
 
 
 def _docx() -> bytes:
-    spremnik = io.BytesIO()
-    docx.Document().save(spremnik)
-    return spremnik.getvalue()
+    """Ispravan sintetski rad za Rbr. 54 (naslovnica + tijelo, A4)."""
+    return ispravan(54, profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes()))
 
 
 def _kontekst(naziv=NAZIV):
@@ -112,7 +110,13 @@ def test_iskljuceno_pravilo_nema_nalaza():
     )
     izvjestaj = provjeri(_docx(), iskljucen, _kontekst("pogresan.docx"))
     assert status_pravila(izvjestaj.nalazi, "R-NAZIV") is None
-    assert not spremnost(izvjestaj)  # bez ijednog nalaza rad nije spreman
+    assert spremnost(izvjestaj)  # pogrešan naziv se ne provjerava
+
+
+def test_izvjestaj_bez_nalaza_nije_spreman():
+    from provjera.jezgra.nalaz import Izvjestaj
+
+    assert not spremnost(Izvjestaj(None, (), "abcd1234", 54))
 
 
 def test_svaki_kljuc_registriranog_pravila_je_u_katalogu():

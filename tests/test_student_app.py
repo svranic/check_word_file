@@ -1,9 +1,8 @@
-import io
 import logging
 from pathlib import Path
 
-import docx
 import pytest
+from alati.generator import ispravan
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 from streamlit.testing.v1 import AppTest
 
@@ -120,9 +119,8 @@ def test_djelomicno_neispravni_profili(monkeypatch):
 
 
 def _docx() -> bytes:
-    spremnik = io.BytesIO()
-    docx.Document().save(spremnik)
-    return spremnik.getvalue()
+    """Ispravan sintetski rad za Rbr. 54 (naslovnica + tijelo, A4)."""
+    return ispravan(54, profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes()))
 
 
 def _ucitaj(at: AppTest, naziv: str, sadrzaj: bytes) -> AppTest:

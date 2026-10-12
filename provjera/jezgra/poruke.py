@@ -10,12 +10,8 @@ a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefik
 from collections.abc import Mapping
 from decimal import ROUND_HALF_UP, Decimal
 from types import MappingProxyType
-from typing import TYPE_CHECKING
-
 from provjera.jezgra.jedinice import Jedinica, twips_u_cm
-
-if TYPE_CHECKING:
-    from provjera.jezgra.nalaz import Izvor, Lokacija, Nalaz
+from provjera.jezgra.nalaz import Izvor, Lokacija, Nalaz, Vrijednost
 
 KATALOG: Mapping[str, str] = MappingProxyType(
     {
@@ -109,6 +105,59 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Datoteka je povezana sa studentom, ali ne po točnom nazivu. "
             "Očekivani naziv je {ocekivano}."
         ),
+        "pravilo.R-SEKCIJE": "Naslovnica kao zasebna sekcija",
+        "R-SEKCIJE.prolazi": "Naslovnica je zasebna sekcija, a rad se nastavlja na novoj stranici.",
+        "R-SEKCIJE.jedna_sekcija": (
+            "Dokument ima samo jednu sekciju, a naslovnica mora biti zasebna sekcija. "
+            "Stavi kursor na kraj naslovnice i odaberi Izgled (Layout) → "
+            "Prijelomi (Breaks) → Sljedeća stranica (Next Page)."
+        ),
+        "R-SEKCIJE.krivi_prijelom": (
+            "Naslovnicu od sekcije {sekcija} ne dijeli prijelom tipa „Sljedeća stranica“. "
+            "Obriši postojeći prijelom sekcije nakon naslovnice i umetni Izgled (Layout) → "
+            "Prijelomi (Breaks) → Sljedeća stranica (Next Page)."
+        ),
+        "R-SEKCIJE.bez_sekcija": (
+            "U dokumentu nisu zapisane postavke sekcija pa raspored nije moguće provjeriti."
+        ),
+        "pravilo.R-MARGINE": "Margine i stranica",
+        "R-MARGINE.prolazi": "Sekcija {sekcija}: margine su ispravne.",
+        "R-MARGINE.sekcija_odstupa": (
+            "Sekcija {sekcija}: margine nisu ispravne. Pronađeno: gore {gore_pronadeno}, "
+            "dolje {dolje_pronadeno}, lijevo {lijevo_pronadeno}, desno {desno_pronadeno}. "
+            "Očekivano: gore {gore_ocekivano}, dolje {dolje_ocekivano}, "
+            "lijevo {lijevo_ocekivano}, desno {desno_ocekivano} "
+            "(dopušteno odstupanje {tolerancija}). Stavi kursor u sekciju {sekcija} pa "
+            "odaberi Izgled (Layout) → Margine (Margins) → Prilagođene margine "
+            "(Custom Margins), uz Primijeni na (Apply to): Ovaj odjeljak (This section)."
+        ),
+        "R-MARGINE.nedostaje": (
+            "Sekcija {sekcija}: margine nisu zapisane u dokumentu pa ih nije "
+            "moguće provjeriti."
+        ),
+        "R-MARGINE.nedostaje_stranica": (
+            "Sekcija {sekcija}: veličina stranice nije zapisana u dokumentu pa je nije "
+            "moguće provjeriti."
+        ),
+        "R-MARGINE.bez_sekcija": (
+            "U dokumentu nisu zapisane postavke stranice pa margine nije moguće provjeriti."
+        ),
+        "R-MARGINE.nije_a4": (
+            "Sekcija {sekcija}: veličina stranice je {sirina} × {visina}, a treba biti A4. "
+            "Odaberi Izgled (Layout) → Veličina (Size) → A4."
+        ),
+        "R-MARGINE.pejzazno": (
+            "Sekcija {sekcija}: stranica je položena. Odaberi Izgled (Layout) → "
+            "Usmjerenje (Orientation) → Uspravno (Portrait)."
+        ),
+        "R-MARGINE.gutter": (
+            "Sekcija {sekcija}: postavljena je margina za uvez (Gutter) od {pronadeno}. "
+            "U Prilagođenim marginama (Custom Margins) postavi Uvez (Gutter) na 0 cm."
+        ),
+        "R-MARGINE.zrcalne": (
+            "Dokument koristi zrcalne margine. U Prilagođenim marginama (Custom Margins) "
+            "pod Više stranica (Multiple pages) odaberi Uobičajeno (Normal)."
+        ),
         "opce.neprovjerljivo": (
             "Ovo pravilo nije bilo moguće pouzdano provjeriti ({razlog}). "
             "Pitaj nastavnika da pregleda ovaj dio rada."
@@ -158,17 +207,21 @@ def poruka(kljuc: str, **parametri: str | int) -> str:
     return KATALOG[kljuc].format(**parametri)
 
 
-def tekst_nalaza(nalaz: "Nalaz") -> str:
+def tekst_nalaza(nalaz: Nalaz) -> str:
     """Korak ispravka: poruka nalaza s formatiranim očekivanim i pronađenim vrijednostima."""
     vrijednosti = {
         ime: formatiraj(v.iznos, v.jedinica)
         for ime, v in (("ocekivano", nalaz.ocekivano), ("pronadeno", nalaz.pronadeno))
         if v is not None
     }
-    return poruka(nalaz.poruka_kljuc, **vrijednosti, **nalaz.parametri)
+    parametri = {
+        ime: formatiraj(v.iznos, v.jedinica) if isinstance(v, Vrijednost) else v
+        for ime, v in nalaz.parametri.items()
+    }
+    return poruka(nalaz.poruka_kljuc, **{**parametri, **vrijednosti})
 
 
-def opis_lokacije(lokacija: "Lokacija") -> str:
+def opis_lokacije(lokacija: Lokacija) -> str:
     dijelovi = [poruka(f"lokacija.{lokacija.dio.value}")]
     if lokacija.sekcija is not None:
         dijelovi.append(poruka("lokacija.sekcija", sekcija=lokacija.sekcija))
@@ -178,7 +231,7 @@ def opis_lokacije(lokacija: "Lokacija") -> str:
     return f"{opis}: „{lokacija.isjecak}…“" if lokacija.isjecak else opis
 
 
-def opis_izvora(izvor: "Izvor") -> str:
+def opis_izvora(izvor: Izvor) -> str:
     opis = poruka(f"izvor.{izvor.vrsta.value}")
     return f"{opis} „{izvor.stil}“" if izvor.stil else opis
 

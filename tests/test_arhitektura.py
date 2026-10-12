@@ -150,6 +150,24 @@ def test_graf_uvoza_hvata_zabranjen_modul(tmp_path):
     assert "openpyxl" in ucitani_zabranjeni_moduli(skripta)
 
 
+def test_python_docx_i_lxml_samo_u_modelu():
+    # AD-3: pristup python-docx/lxml izoliran je u jezgra/model/.
+    prekrsaji = []
+    for datoteka in sorted((KORIJEN / "provjera").rglob("*.py")) + sorted(APPS.glob("*.py")):
+        if (JEZGRA / "model") in datoteka.parents:
+            continue
+        for cvor in ast.walk(ast.parse(datoteka.read_text(encoding="utf-8"))):
+            if isinstance(cvor, ast.Import):
+                moduli = [a.name for a in cvor.names]
+            elif isinstance(cvor, ast.ImportFrom) and cvor.module:
+                moduli = [cvor.module]
+            else:
+                continue
+            if any(m.split(".")[0] in {"docx", "lxml"} for m in moduli):
+                prekrsaji.append(f"{datoteka.relative_to(KORIJEN).as_posix()}:{cvor.lineno}")
+    assert prekrsaji == []
+
+
 def test_student_ne_koristi_predmemoriju():
     # AD-10: dokument ne smije završiti u st.cache_*.
     stablo = ast.parse((APPS / "student.py").read_text(encoding="utf-8"))

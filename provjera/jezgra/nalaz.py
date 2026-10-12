@@ -52,7 +52,10 @@ class Izvor:
     stil: str | None = None
 
 
-def _zamrzni(parametri: Mapping[str, str | int]) -> Mapping[str, str | int]:
+Parametar = str | int | Vrijednost
+
+
+def _zamrzni(parametri: Mapping[str, Parametar]) -> Mapping[str, Parametar]:
     return MappingProxyType(dict(parametri))
 
 
@@ -65,7 +68,8 @@ class Nalaz:
     ocekivano: Vrijednost | None = None
     pronadeno: Vrijednost | None = None
     izvor: Izvor | None = None
-    parametri: Mapping[str, str | int] = field(default_factory=dict)
+    # Vrijednost u parametrima formatira poruke.tekst_nalaza (npr. sve četiri margine).
+    parametri: Mapping[str, Parametar] = field(default_factory=dict)
     pojave: int = 1
 
     def __post_init__(self) -> None:

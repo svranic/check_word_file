@@ -26,3 +26,5 @@ packages = ["provjera"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# tests/alati (generator referentnog skupa) uvozi se kao `alati`.
+pythonpath = ["tests"]

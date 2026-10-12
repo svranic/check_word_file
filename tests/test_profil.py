@@ -26,7 +26,7 @@ def test_verzija_ne_ovisi_o_redoslijedu_ni_komentarima():
     # Isti sadržaj: obrnut redoslijed odjeljaka i ključeva, drugi komentari.
     preuredeni = (
         "# drugi komentar\n"
-        "[tolerancije]\nmargine = \"0,03 cm\"\n"
+        "[tolerancije]\nstranica = \"0,1 cm\"\nmargine = \"0,03 cm\"\n"
         "[formula]\nsjeme = 20261012\nnaslovnica = \"2,5 cm\"\nkorak = \"0,1 cm\"\n"
         "raspon = \"0,5 cm\"\nosnovica_desno = \"2,5 cm\"\nosnovica_lijevo = \"3 cm\"\n"
         "osnovica_dolje = \"2,5 cm\"\nosnovica_gore = \"2,5 cm\"\n"

@@ -1,0 +1,35 @@
+# Referentni skup Vježbe 1: za svaki primjer skup pravila koja ne smiju proći.
+# Primjere generira tests/alati/generator.py; imena i JMBAG su izmišljeni.
+
+rbr = 54
+naziv = "Ana_Horvat_GiG_OG_Vjezba_1.docx"
+
+[primjeri.ispravan]
+padaju = []
+
+[primjeri.unutar_tolerancije]
+padaju = []
+
+[primjeri.jedna_sekcija]
+padaju = ["R-SEKCIJE"]
+
+[primjeri.neprekinuti_prijelom]
+padaju = ["R-SEKCIJE"]
+
+[primjeri.krive_margine_tijela]
+padaju = ["R-MARGINE"]
+
+[primjeri.krive_margine_naslovnice]
+padaju = ["R-MARGINE"]
+
+[primjeri.letter]
+padaju = ["R-MARGINE"]
+
+[primjeri.pejzazno]
+padaju = ["R-MARGINE"]
+
+[primjeri.gutter]
+padaju = ["R-MARGINE"]
+
+[primjeri.zrcalne]
+padaju = ["R-MARGINE"]

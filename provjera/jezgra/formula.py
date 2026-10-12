@@ -7,12 +7,58 @@ Rbr. n dobiva n-tu dopuštenu kombinaciju.
 """
 
 import hashlib
+import json
 from dataclasses import dataclass, fields
 from functools import lru_cache
 from math import gcd
 
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
+
 from provjera.jezgra import jedinice
-from provjera.jezgra.profil import ParametriFormule, kanonski_json
+from provjera.jezgra.tipovi import DuljinaMm
+
+# Gornja granica prostora formule margina (21⁴); štiti od preduge izgradnje tablice.
+NAJVISE_KOMBINACIJA = 21**4
+
+
+class ParametriFormule(BaseModel):
+    """Odjeljak ``[formula]`` profila; sve duljine u cijelim milimetrima."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    osnovica_gore: DuljinaMm
+    osnovica_dolje: DuljinaMm
+    osnovica_lijevo: DuljinaMm
+    osnovica_desno: DuljinaMm
+    raspon: DuljinaMm
+    korak: DuljinaMm
+    naslovnica: DuljinaMm
+    sjeme: StrictInt = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _provjeri_odnose(self) -> "ParametriFormule":
+        greske = []
+        if self.korak <= 0:
+            greske.append("korak mora biti veći od 0")
+        elif self.raspon <= 0 or self.raspon % self.korak:
+            greske.append("raspon mora biti pozitivan višekratnik koraka")
+        elif (2 * (self.raspon // self.korak) + 1) ** 4 > NAJVISE_KOMBINACIJA:
+            greske.append(f"raspon/korak daje više od {NAJVISE_KOMBINACIJA} kombinacija")
+        for strana in ("gore", "dolje", "lijevo", "desno"):
+            if getattr(self, f"osnovica_{strana}") - self.raspon <= 0:
+                greske.append(f"osnovica_{strana} mora biti veća od raspona")
+        if self.naslovnica <= 0:
+            greske.append("naslovnica mora biti veća od 0")
+        if greske:
+            raise ValueError("; ".join(greske))
+        return self
+
+
+def kanonski_json(podaci: object) -> bytes:
+    return json.dumps(
+        podaci, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+
 
 # Svaka promjena algoritma podiže verziju i zahtijeva novi snapshot.
 FORMULA_VERZIJA = 1

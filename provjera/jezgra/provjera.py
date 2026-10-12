@@ -44,6 +44,8 @@ def provjeri(docx: bytes, profil: Profil, kontekst: KontekstProvjere) -> Izvjest
     # MemoryError je preopterećenje instance, ne svojstvo dokumenta: propušta se pozivatelju.
     try:
         dokument = model.procitaj(docx)
+    except model.NeispravanDokument:
+        return Izvjestaj(ulaz.RazlogOdbijanja.OSTECENA, (), verzija(profil), kontekst.rbr)
     except MemoryError:
         raise
     except Exception:  # noqa: BLE001 — pravila koja trebaju model postaju neprovjerljiva
