@@ -1,0 +1,28 @@
+# Profil zadatka za Vježbu 1 (Osnove geoinformatike). Bez osobnih podataka.
+# Mjere se pišu kao tekst s jedinicom: "3 cm", "25 mm", "12 pt".
+
+[vjezba]
+id = "vjezba_1"
+naziv = "Vježba 1"
+objavljeno = true
+
+[naziv_datoteke]
+sufiks = "_GiG_OG_Vjezba_1"
+nastavak = ".docx"
+
+[formula]
+# Osnovice margina sekcija tijela; individualni pomak je ± raspon u koracima.
+osnovica_gore = "2,5 cm"
+osnovica_dolje = "2,5 cm"
+osnovica_lijevo = "3 cm"
+osnovica_desno = "2,5 cm"
+raspon = "0,5 cm"
+korak = "0,1 cm"
+# Margine naslovnice (iste za sve studente); ta kombinacija nikad nije individualna.
+naslovnica = "2,5 cm"
+# Novo sjeme daje novi raspored margina za sljedeću vježbu.
+sjeme = 20261012
+
+[tolerancije]
+# Mora biti manja od pola koraka formule.
+margine = "0,03 cm"

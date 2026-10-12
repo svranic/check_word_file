@@ -1,11 +1,15 @@
 """Katalog poruka (AD-11): jedini izvor teksta koji vidi korisnik.
 
 Ključevi pravila imaju oblik ``<pravilo_id>.<slucaj>``; ostali tekst sučelja
-koristi prefikse ``app.``, ``nastavnik.`` i ``privatnost.``.
+koristi prefikse ``app.``, ``nastavnik.``, ``privatnost.``, ``profil.``,
+``vjezba.``, ``rbr.``, ``margine.`` i ``naziv.``.
 """
 
 from collections.abc import Mapping
+from decimal import ROUND_HALF_UP, Decimal
 from types import MappingProxyType
+
+from provjera.jezgra.jedinice import Jedinica, twips_u_cm
 
 KATALOG: Mapping[str, str] = MappingProxyType(
     {
@@ -19,6 +23,43 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "i ništa se ne sprema: ni datoteka ni rezultat provjere."
         ),
         "nastavnik.naslov": "Provjera Word dokumenata – nastavnik",
+        "profil.nedostupno": (
+            "Provjera trenutno nije dostupna. Pokušaj kasnije ili se javi nastavniku."
+        ),
+        "profil.djelomicno_nedostupno": (
+            "Provjera za neke vježbe trenutno nije dostupna. "
+            "Ako tvoja vježba nije na popisu, javi se nastavniku."
+        ),
+        "vjezba.odabir": "Vježba",
+        "rbr.oznaka": "Tvoj redni broj (Rbr.) iz PDF-a sa svojstvima",
+        "rbr.primjer": "npr. 54",
+        "vrijednost.da": "da",
+        "vrijednost.ne": "ne",
+        "rbr.potvrdi": "Prikaži moje margine",
+        "rbr.prazno": "Upiši svoj redni broj, npr. 54.",
+        "rbr.neispravno": "Redni broj mora biti pozitivan cijeli broj, npr. 54.",
+        "rbr.prevelik": (
+            "Redni broj {rbr} ne postoji za ovu vježbu (najveći je {najveci}). "
+            "Provjeri broj u PDF-u sa svojstvima."
+        ),
+        "margine.naslov": "Tvoje margine za sekcije rada nakon naslovnice",
+        "margine.gore": "Gore (Top)",
+        "margine.dolje": "Dolje (Bottom)",
+        "margine.lijevo": "Lijevo (Left)",
+        "margine.desno": "Desno (Right)",
+        "margine.uputa": (
+            "U Wordu: Izgled (Layout) → Margine (Margins) → "
+            "Prilagođene margine (Custom Margins)."
+        ),
+        "margine.naslovnica": "Naslovnica ima margine {naslovnica} sa svih strana.",
+        "margine.usporedi": (
+            "Provjeri jesu li margine iste kao u PDF-u sa svojstvima. "
+            "Ako nisu, upisao si krivi redni broj."
+        ),
+        "naziv.obrazac": (
+            "Naziv datoteke: `{obrazac}`, s tvojim imenom i prezimenom "
+            "kako su zapisani u ISVU-u."
+        ),
     }
 )
 
@@ -26,3 +67,19 @@ KATALOG: Mapping[str, str] = MappingProxyType(
 def poruka(kljuc: str, **parametri: str | int) -> str:
     """Vraća tekst poruke s umetnutim parametrima; nepoznat ključ baca ``KeyError``."""
     return KATALOG[kljuc].format(**parametri)
+
+
+def _decimalni_zarez(iznos: Decimal) -> str:
+    tekst = f"{iznos.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):.2f}"
+    return tekst.rstrip("0").rstrip(".").replace(".", ",")
+
+
+def formatiraj(iznos: int | str | bool, jedinica: Jedinica) -> str:
+    """Prikaz vrijednosti: twipsi kao cm s decimalnim zarezom, polutočke kao pt."""
+    if jedinica is Jedinica.TWIPS:
+        return f"{_decimalni_zarez(twips_u_cm(iznos))} cm"
+    if jedinica is Jedinica.POLUTOCKE:
+        return f"{_decimalni_zarez(Decimal(iznos) / 2)} pt"
+    if jedinica is Jedinica.BOOL:
+        return poruka("vrijednost.da" if iznos else "vrijednost.ne")
+    return str(iznos)
