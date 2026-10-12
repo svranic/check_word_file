@@ -4,7 +4,7 @@ Ključevi pravila imaju oblik ``<pravilo_id>.<slucaj>`` (npr. ``R-NAZIV.prolazi`
 a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefiksu:
 ``app.``, ``nastavnik.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
 ``margine.``, ``naziv.``, ``ulaz.``, ``opce.``, ``status.``, ``izvjestaj.``,
-``lokacija.``, ``izvor.`` i ``vrijednost.``.
+``lokacija.``, ``izvor.``, ``sazetak.`` i ``vrijednost.``.
 """
 
 from collections.abc import Mapping
@@ -183,6 +183,21 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Provjera nije uspjela zbog neočekivane greške. Pokušaj ponovno za minutu, "
             "a ako se ponovi, javi se nastavniku."
         ),
+        "sazetak.naslov": "Sažetak provjere Word dokumenta",
+        "sazetak.rbr": "Redni broj (Rbr.)",
+        "sazetak.vjezba": "Vježba",
+        "sazetak.verzija": "Verzija profila",
+        "sazetak.vrijeme": "Vrijeme provjere (po zagrebačkom vremenu)",
+        "sazetak.spremno": "✅ Rad je bio spreman za predaju.",
+        "sazetak.nije_spremno": "❌ Rad nije bio spreman za predaju.",
+        "sazetak.stupac_pravilo": "Provjera",
+        "sazetak.stupac_status": "Status",
+        "sazetak.napomena": (
+            "Sažetak ne sadrži sadržaj rada ni naziv datoteke. Provjeru je moguće "
+            "ponoviti u bilo kojem trenutku."
+        ),
+        "sazetak.preuzmi": "Preuzmi sažetak",
+        "sazetak.datoteka": "sazetak_provjere_rbr_{rbr}.html",
         "lokacija.DOKUMENT": "Dokument",
         "lokacija.NAZIV": "Naziv datoteke",
         "lokacija.TIJELO": "Tijelo dokumenta",

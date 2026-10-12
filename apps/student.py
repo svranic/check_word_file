@@ -3,6 +3,8 @@
 from pathlib import Path
 
 import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import streamlit as st
 
@@ -17,10 +19,12 @@ from provjera.jezgra.poruke import (
     tekst_nalaza,
 )
 from provjera.jezgra.provjera import provjeri, spremnost
+from provjera.jezgra.sazetak import html_sazetka
 
 MAPA_PROFILA = Path(__file__).resolve().parents[1] / "profili"
 # Stanje vezano uz jednu provjeru; briše se pri promjeni Rbr. ili vježbe (FR-9).
-KLJUCEVI_PROVJERE = ("izvjestaj", "greska_provjere")
+KLJUCEVI_PROVJERE = ("izvjestaj", "greska_provjere", "vrijeme_provjere")
+VREMENSKA_ZONA = ZoneInfo("Europe/Zagreb")
 # FR-11: redoslijed grupa nalaza u izvještaju.
 REDOSLIJED_GRUPA = (Status.NE_PROLAZI, Status.NEPROVJERLJIVO, Status.PROSLO)
 VELICINA_PO_RAZLOGU = {
@@ -78,11 +82,15 @@ def ucitaj_dokument(odabrani: profil.Profil, broj: int) -> None:
         max_upload_size=ulaz.NAJVECA_VELICINA_MB + 1,
     )
     if datoteka is not None:
-        st.session_state.pop("izvjestaj", None)
-        st.session_state.pop("greska_provjere", None)
+        for kljuc in KLJUCEVI_PROVJERE:
+            st.session_state.pop(kljuc, None)
         kontekst = KontekstProvjere(datoteka.name, broj, None, None)
         try:
             st.session_state["izvjestaj"] = provjeri(datoteka.getvalue(), odabrani, kontekst)
+            # Vrijeme dodaje stranica (adapter); jezgra ne čita sat.
+            st.session_state["vrijeme_provjere"] = datetime.now(VREMENSKA_ZONA).strftime(
+                "%d.%m.%Y. %H:%M"
+            )
         except MemoryError:
             st.session_state["greska_provjere"] = "izvjestaj.preopterecenje"
         except Exception:  # noqa: BLE001 — student nikad ne vidi traceback
@@ -97,6 +105,11 @@ def ucitaj_dokument(odabrani: profil.Profil, broj: int) -> None:
             prikazi_izvjestaj(st.session_state["izvjestaj"])
         except Exception:  # noqa: BLE001 — student nikad ne vidi traceback
             st.error(poruka("izvjestaj.greska"))
+        else:
+            try:
+                ponudi_sazetak(st.session_state["izvjestaj"], odabrani)
+            except Exception:  # noqa: BLE001 — bez sažetka izvještaj i dalje vrijedi
+                pass
 
 
 def prikazi_nalaz(nalaz: Nalaz) -> None:
@@ -115,6 +128,18 @@ def prikazi_nalaz(nalaz: Nalaz) -> None:
         if nalaz.izvor is not None:
             with st.expander(poruka("izvjestaj.tehnicki_detalji")):
                 st.write(bez_markdowna(poruka("izvjestaj.izvor", izvor=opis_izvora(nalaz.izvor))))
+
+
+def ponudi_sazetak(izvjestaj: Izvjestaj, odabrani: profil.Profil) -> None:
+    if izvjestaj.odbijeno is not None:
+        return
+    vrijeme = st.session_state["vrijeme_provjere"]
+    st.download_button(
+        poruka("sazetak.preuzmi"),
+        data=html_sazetka(izvjestaj, odabrani.vjezba.naziv, vrijeme).encode("utf-8"),
+        file_name=poruka("sazetak.datoteka", rbr=izvjestaj.rbr),
+        mime="text/html",
+    )
 
 
 def prikazi_izvjestaj(izvjestaj: Izvjestaj) -> None:

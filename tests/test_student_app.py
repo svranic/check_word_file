@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 
 import pytest
@@ -283,3 +284,68 @@ def test_uspjesno_ponovno_ucitavanje_brise_staru_gresku(monkeypatch):
     at = _ucitaj(at, ISPRAVAN_NAZIV, _docx())
     assert not at.error
     assert [s.value for s in at.success] == [poruka("izvjestaj.spremno")]
+
+
+# --- Sažetak (priča 1.6) -----------------------------------------------------
+
+
+def test_gumb_za_sazetak_uz_izvjestaj(aplikacija):
+    at = _ucitaj(_posalji(aplikacija, "54"), ISPRAVAN_NAZIV, _docx())
+    [gumb] = at.get("download_button")
+    assert gumb.proto.label == poruka("sazetak.preuzmi")
+    assert re.fullmatch(r"\d\d\.\d\d\.\d{4}\. \d\d:\d\d", at.session_state["vrijeme_provjere"])
+
+
+def test_nema_sazetka_za_odbijenu_datoteku(aplikacija):
+    at = _ucitaj(_posalji(aplikacija, "54"), "rad.pdf", b"%PDF-1.7")
+    assert at.get("download_button") == []
+
+
+def test_promjena_rbr_brise_vrijeme_provjere(aplikacija):
+    at = _ucitaj(_posalji(aplikacija, "54"), ISPRAVAN_NAZIV, _docx())
+    at = _posalji(at, "55")
+    assert "vrijeme_provjere" not in at.session_state
+    assert at.get("download_button") == []
+
+
+def test_sazetak_dobiva_vjezbu_i_vrijeme_provjere(monkeypatch):
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from provjera.jezgra import sazetak
+
+    pozivi = []
+    pravi = sazetak.html_sazetka
+
+    def spijun(izvjestaj, naziv_vjezbe, vrijeme):
+        pozivi.append((izvjestaj, naziv_vjezbe, vrijeme))
+        return pravi(izvjestaj, naziv_vjezbe, vrijeme)
+
+    monkeypatch.setattr(sazetak, "html_sazetka", spijun)
+    at = _ucitaj(_posalji(AppTest.from_file(STUDENT).run(), "54"), ISPRAVAN_NAZIV, _docx())
+    izvjestaj, naziv_vjezbe, vrijeme = pozivi[-1]
+    assert naziv_vjezbe == "Vježba 1"
+    assert vrijeme == at.session_state["vrijeme_provjere"]
+    sada = datetime.now(ZoneInfo("Europe/Zagreb"))
+    assert vrijeme in {(sada - timedelta(minutes=m)).strftime("%d.%m.%Y. %H:%M") for m in (0, 1)}
+    assert ISPRAVAN_NAZIV not in pravi(izvjestaj, naziv_vjezbe, vrijeme)
+    assert poruka("sazetak.datoteka", rbr=54) == "sazetak_provjere_rbr_54.html"
+
+
+def test_gumb_za_sazetak_i_za_nespreman_rad(aplikacija):
+    at = _ucitaj(_posalji(aplikacija, "54"), "pogresan naziv.docx", _docx())
+    assert [e.value for e in at.error] == [poruka("izvjestaj.nije_spremno")]
+    assert len(at.get("download_button")) == 1
+
+
+def test_greska_sazetka_ne_prikazuje_gresku_provjere(monkeypatch):
+    from provjera.jezgra import sazetak
+
+    def baca(*_):
+        raise ValueError
+
+    monkeypatch.setattr(sazetak, "html_sazetka", baca)
+    at = _ucitaj(_posalji(AppTest.from_file(STUDENT).run(), "54"), ISPRAVAN_NAZIV, _docx())
+    assert not at.error
+    assert at.success
+    assert at.get("download_button") == []
