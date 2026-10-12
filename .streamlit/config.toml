@@ -1,0 +1,7 @@
+[server]
+# MB; studentska aplikacija dodatno ograničava widget, a jezgra provjerava veličinu (AD-12)
+maxUploadSize = 10
+
+[theme]
+base = "light"
+primaryColor = "#1f5f99"

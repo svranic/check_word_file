@@ -1,0 +1,28 @@
+[project]
+name = "provjera-word"
+version = "0.1.0"
+description = "Provjera tehničkog oblikovanja Word zadaća (Osnove geoinformatike)"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "streamlit==1.65.0",
+    "python-docx==1.2.0",
+    "pydantic==2.14.1",
+    "openpyxl==3.1.5",
+    "fpdf2==2.8.9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["provjera"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

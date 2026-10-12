@@ -1,0 +1,26 @@
+# Stvarni podaci (ISVU izvozi, studentski radovi) nikad ne ulaze u repozitorij (AD-2)
+samples/
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+*.docx
+*.doc
+*.pdf
+# Sintetski testni podaci smiju biti u tests/
+!tests/**/*.xlsx
+!tests/**/*.xls
+!tests/**/*.xlsm
+!tests/**/*.csv
+!tests/**/*.docx
+!tests/**/*.doc
+!tests/**/*.pdf
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
