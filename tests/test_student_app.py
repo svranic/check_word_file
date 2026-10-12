@@ -8,11 +8,23 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 from streamlit.testing.v1 import AppTest
 
 from provjera.jezgra import formula, profil
+from provjera.jezgra.nalaz import (
+    Dio,
+    Izvjestaj,
+    Izvor,
+    Lokacija,
+    Nalaz,
+    Status,
+    Vrijednost,
+    VrstaIzvora,
+)
+from provjera.jezgra.ulaz import RazlogOdbijanja
 from provjera.jezgra.jedinice import Jedinica
 from provjera.jezgra.poruke import formatiraj, poruka
 
 KORIJEN = Path(__file__).resolve().parents[1]
 STUDENT = str(KORIJEN / "apps" / "student.py")
+ISPRAVAN_NAZIV = "Lucija_Šimek_GiG_OG_Vjezba_1.docx"
 
 
 @pytest.fixture
@@ -63,10 +75,10 @@ def test_prevelik_rbr(aplikacija):
 def test_promjena_rbr_brise_provjeru(aplikacija):
     at = _posalji(aplikacija, "54")
     at.session_state["izvjestaj"] = "stari izvještaj"
-    at.session_state["rezultat_ulaza"] = "prihvaceno"
+    at.session_state["greska_provjere"] = "izvjestaj.greska"
     at = _posalji(at, "55")
     assert "izvjestaj" not in at.session_state
-    assert "rezultat_ulaza" not in at.session_state
+    assert "greska_provjere" not in at.session_state
 
 
 def test_isti_rbr_ne_brise_provjeru(aplikacija):
@@ -123,10 +135,10 @@ def test_polje_za_ucitavanje_tek_uz_valjan_rbr(aplikacija):
     assert _posalji(aplikacija, "54").file_uploader
 
 
-def test_ispravan_docx_je_prihvacen(aplikacija):
-    at = _ucitaj(_posalji(aplikacija, "54"), "Rad.DOCX", _docx())
+def test_ispravan_docx_i_naziv_su_spremni(aplikacija):
+    at = _ucitaj(_posalji(aplikacija, "54"), ISPRAVAN_NAZIV, _docx())
     assert not at.exception
-    assert [s.value for s in at.success] == [poruka("ulaz.prihvaceno")]
+    assert [(s.value, s.icon) for s in at.success] == [(poruka("izvjestaj.spremno"), "✅")]
     assert not at.error
 
 
@@ -162,17 +174,17 @@ def test_bajtovi_ne_ostaju_u_stanju_ni_u_logovima(aplikacija, caplog):
 
 
 def test_promjena_rbr_brise_rezultat_ucitavanja(aplikacija):
-    at = _ucitaj(_posalji(aplikacija, "54"), "Rad.docx", _docx())
+    at = _ucitaj(_posalji(aplikacija, "54"), ISPRAVAN_NAZIV, _docx())
     assert at.success
     at = _posalji(at, "55")
-    assert "rezultat_ulaza" not in at.session_state
+    assert "izvjestaj" not in at.session_state
     assert not at.success
 
 
 @pytest.mark.parametrize(("razlog", "mb"), [("prevelika", 10), ("zip_bomba", 100)])
 def test_poruka_velicine_navodi_granicu(aplikacija, razlog, mb):
     at = _posalji(aplikacija, "54")
-    at.session_state["rezultat_ulaza"] = razlog
+    at.session_state["izvjestaj"] = Izvjestaj(RazlogOdbijanja(razlog), (), "abcd1234", 54)
     at = at.run()
     assert [e.value for e in at.error] == [poruka(f"ulaz.{razlog}", mb=mb)]
     assert f"{mb} MB" in at.error[0].value
@@ -187,3 +199,89 @@ def test_polje_dopusta_vecu_datoteku_od_granice_jezgre(aplikacija):
     # Streamlit ne smije odbiti datoteku prije jezgre, inače student vidi englesku poruku.
     at = _posalji(aplikacija, "54")
     assert at.file_uploader[0].proto.max_upload_size_mb > 10
+
+
+# --- Izvještaj (priča 1.4) ---------------------------------------------------
+
+
+def _n(status, pravilo="R-NAZIV", izvor=None, pojave=1):
+    return Nalaz(
+        pravilo, status, Lokacija(Dio.NAZIV), "R-NAZIV.ne_odgovara_obrascu",
+        ocekivano=Vrijednost("Ime_Prezime_GiG_OG_Vjezba_1.docx", Jedinica.TEKST),
+        pronadeno=Vrijednost("moj_rad.docx", Jedinica.TEKST), izvor=izvor, pojave=pojave,
+    )
+
+
+def test_redoslijed_grupa_i_status_tekstom(aplikacija):
+    at = _posalji(aplikacija, "54")
+    nalazi = (_n(Status.PROSLO), _n(Status.NEPROVJERLJIVO), _n(Status.NE_PROLAZI, pojave=3))
+    at.session_state["izvjestaj"] = Izvjestaj(None, nalazi, "abcd1234", 54)
+    at = at.run()
+    assert [(e.value, e.icon) for e in at.error] == [(poruka("izvjestaj.nije_spremno"), "❌")]
+    assert [h.value for h in at.subheader][-3:] == [
+        poruka("izvjestaj.grupa.NE_PROLAZI"),
+        poruka("izvjestaj.grupa.NEPROVJERLJIVO"),
+        poruka("izvjestaj.grupa.PROSLO"),
+    ]
+    redci_statusa = [m.value for m in at.markdown if m.value.startswith("**")]
+    assert [r.split("**")[1] for r in redci_statusa] == [
+        poruka("status.NE_PROLAZI"), poruka("status.NEPROVJERLJIVO"), poruka("status.PROSLO"),
+    ]
+    natpisi = [c.value for c in at.caption]
+    assert any("Očekivano" in c and "Ime" in c for c in natpisi)
+    assert any("Pronađeno" in c for c in natpisi)
+    assert poruka("izvjestaj.pojave", pojave=3) in natpisi
+    assert poruka("izvjestaj.verzija_profila", verzija="abcd1234") in natpisi
+
+
+def test_tehnicki_detalji_u_prosirivom_dijelu(aplikacija):
+    at = _posalji(aplikacija, "54")
+    nalaz = _n(Status.NE_PROLAZI, izvor=Izvor(VrstaIzvora.STIL, "Normal"))
+    at.session_state["izvjestaj"] = Izvjestaj(None, (nalaz,), "abcd1234", 54)
+    at = at.run()
+    [prosirivi] = at.expander
+    assert prosirivi.label == poruka("izvjestaj.tehnicki_detalji")
+    assert "Normal" in prosirivi.markdown[0].value
+
+
+def test_neispravan_naziv_prikazuje_obrazac(aplikacija):
+    at = _ucitaj(_posalji(aplikacija, "54"), "moj rad.docx", _docx())
+    assert [e.value for e in at.error] == [poruka("izvjestaj.nije_spremno")]
+    tekst = " ".join(m.value for m in at.markdown).replace("\\", "")
+    assert "Ime_Prezime_GiG_OG_Vjezba_1.docx" in tekst
+
+
+@pytest.mark.parametrize(("iznimka", "kljuc"), [(MemoryError, "izvjestaj.preopterecenje"), (RuntimeError, "izvjestaj.greska")])
+def test_preopterecenje_ne_rusi_stranicu(monkeypatch, iznimka, kljuc):
+    def baca(*_):
+        raise iznimka()
+
+    monkeypatch.setattr("provjera.jezgra.provjera.provjeri", baca)
+    at = _ucitaj(_posalji(AppTest.from_file(STUDENT).run(), "54"), ISPRAVAN_NAZIV, _docx())
+    assert not at.exception
+    assert [e.value for e in at.error] == [poruka(kljuc)]
+    assert at.file_uploader
+
+
+def test_naziv_s_markdown_znakovima_je_escapiran(aplikacija):
+    at = _ucitaj(_posalji(aplikacija, "54"), "moj__rad*1*.docx", _docx())
+    izvorni = [m.value for m in at.markdown] + [c.value for c in at.caption]
+    assert any(r"moj\_\_rad\*1\*\.docx" in t for t in izvorni)
+    assert not any("moj__rad*1*" in t for t in izvorni)
+
+
+def test_uspjesno_ponovno_ucitavanje_brise_staru_gresku(monkeypatch):
+    from provjera.jezgra import provjera as modul
+
+    pravi = modul.provjeri
+
+    def baca(*_):
+        raise MemoryError
+
+    monkeypatch.setattr(modul, "provjeri", baca)
+    at = _ucitaj(_posalji(AppTest.from_file(STUDENT).run(), "54"), ISPRAVAN_NAZIV, _docx())
+    assert [e.value for e in at.error] == [poruka("izvjestaj.preopterecenje")]
+    monkeypatch.setattr(modul, "provjeri", pravi)
+    at = _ucitaj(at, ISPRAVAN_NAZIV, _docx())
+    assert not at.error
+    assert [s.value for s in at.success] == [poruka("izvjestaj.spremno")]

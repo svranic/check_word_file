@@ -26,3 +26,6 @@ sjeme = 20261012
 [tolerancije]
 # Mora biti manja od pola koraka formule.
 margine = "0,03 cm"
+
+[pravila.R-NAZIV]
+ukljuceno = true

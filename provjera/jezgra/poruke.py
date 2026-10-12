@@ -1,15 +1,21 @@
 """Katalog poruka (AD-11): jedini izvor teksta koji vidi korisnik.
 
-Ključevi pravila imaju oblik ``<pravilo_id>.<slucaj>``; ostali tekst sučelja
-koristi prefikse ``app.``, ``nastavnik.``, ``privatnost.``, ``profil.``,
-``vjezba.``, ``rbr.``, ``margine.`` i ``naziv.``.
+Ključevi pravila imaju oblik ``<pravilo_id>.<slucaj>`` (npr. ``R-NAZIV.prolazi``),
+a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefiksu:
+``app.``, ``nastavnik.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
+``margine.``, ``naziv.``, ``ulaz.``, ``opce.``, ``status.``, ``izvjestaj.``,
+``lokacija.``, ``izvor.`` i ``vrijednost.``.
 """
 
 from collections.abc import Mapping
 from decimal import ROUND_HALF_UP, Decimal
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from provjera.jezgra.jedinice import Jedinica, twips_u_cm
+
+if TYPE_CHECKING:
+    from provjera.jezgra.nalaz import Izvor, Lokacija, Nalaz
 
 KATALOG: Mapping[str, str] = MappingProxyType(
     {
@@ -57,7 +63,6 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Ako nisu, upisao si krivi redni broj."
         ),
         "ulaz.oznaka": "Učitaj svoj rad (.docx)",
-        "ulaz.prihvaceno": "Datoteka je prošla provjeru formata (Word dokument .docx).",
         "ulaz.prazna": (
             "Datoteka je prazna (0 bajtova). Spremi rad ponovno u Wordu i učitaj ga."
         ),
@@ -90,6 +95,56 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Datoteka je oštećena ili nije ispravan Word dokument. Otvori je u Wordu, "
             "provjeri sadržaj i ponovno je spremi kao Word dokument (.docx)."
         ),
+        "pravilo.R-NAZIV": "Naziv datoteke",
+        "R-NAZIV.prolazi": "Naziv datoteke je ispravan.",
+        "R-NAZIV.ne_odgovara_obrascu": (
+            "Naziv „{pronadeno}“ ne odgovara obrascu {ocekivano}. Preimenuj datoteku: "
+            "ime i prezime pišu se bez razmaka, odvojeni podvlakom (_), s hrvatskim "
+            "znakovima, a nakon njih slijedi točno nastavak iz obrasca."
+        ),
+        "R-NAZIV.ne_odgovara_ocekivanom": (
+            "Naziv „{pronadeno}“ nije očekivani naziv {ocekivano}."
+        ),
+        "R-NAZIV.nije_tocno_upareno": (
+            "Datoteka je povezana sa studentom, ali ne po točnom nazivu. "
+            "Očekivani naziv je {ocekivano}."
+        ),
+        "opce.neprovjerljivo": (
+            "Ovo pravilo nije bilo moguće pouzdano provjeriti ({razlog}). "
+            "Pitaj nastavnika da pregleda ovaj dio rada."
+        ),
+        "status.PROSLO": "✅ prošlo",
+        "status.NE_PROLAZI": "❌ ne prolazi",
+        "status.NEPROVJERLJIVO": "⚠️ neprovjerljivo",
+        "izvjestaj.spremno": "Rad je spreman za predaju.",
+        "izvjestaj.nije_spremno": "Rad nije spreman za predaju.",
+        "izvjestaj.grupa.NE_PROLAZI": "Ne prolazi",
+        "izvjestaj.grupa.NEPROVJERLJIVO": "Neprovjerljivo",
+        "izvjestaj.grupa.PROSLO": "Prošlo",
+        "izvjestaj.ocekivano": "Očekivano: {vrijednost}",
+        "izvjestaj.pronadeno": "Pronađeno: {vrijednost}",
+        "izvjestaj.pojave": "Ponavlja se {pojave} puta.",
+        "izvjestaj.tehnicki_detalji": "Tehnički detalji",
+        "izvjestaj.izvor": "Izvor vrijednosti: {izvor}",
+        "izvjestaj.verzija_profila": "Verzija profila: {verzija}",
+        "izvjestaj.preopterecenje": (
+            "Provjera je trenutno preopterećena. Pokušaj ponovno za minutu."
+        ),
+        "izvjestaj.greska": (
+            "Provjera nije uspjela zbog neočekivane greške. Pokušaj ponovno za minutu, "
+            "a ako se ponovi, javi se nastavniku."
+        ),
+        "lokacija.DOKUMENT": "Dokument",
+        "lokacija.NAZIV": "Naziv datoteke",
+        "lokacija.TIJELO": "Tijelo dokumenta",
+        "lokacija.PODNOZJE": "Podnožje",
+        "lokacija.sekcija": "sekcija {sekcija}",
+        "lokacija.odlomak": "odlomak {odlomak}",
+        "izvor.ZADANO": "zadane postavke dokumenta",
+        "izvor.TEMA": "tema dokumenta",
+        "izvor.STIL": "stil",
+        "izvor.IZRAVNO": "izravno oblikovanje",
+        "izvor.SEKCIJA": "postavke sekcije",
         "naziv.obrazac": (
             "Naziv datoteke: `{obrazac}`, s tvojim imenom i prezimenom "
             "kako su zapisani u ISVU-u."
@@ -101,6 +156,31 @@ KATALOG: Mapping[str, str] = MappingProxyType(
 def poruka(kljuc: str, **parametri: str | int) -> str:
     """Vraća tekst poruke s umetnutim parametrima; nepoznat ključ baca ``KeyError``."""
     return KATALOG[kljuc].format(**parametri)
+
+
+def tekst_nalaza(nalaz: "Nalaz") -> str:
+    """Korak ispravka: poruka nalaza s formatiranim očekivanim i pronađenim vrijednostima."""
+    vrijednosti = {
+        ime: formatiraj(v.iznos, v.jedinica)
+        for ime, v in (("ocekivano", nalaz.ocekivano), ("pronadeno", nalaz.pronadeno))
+        if v is not None
+    }
+    return poruka(nalaz.poruka_kljuc, **vrijednosti, **nalaz.parametri)
+
+
+def opis_lokacije(lokacija: "Lokacija") -> str:
+    dijelovi = [poruka(f"lokacija.{lokacija.dio.value}")]
+    if lokacija.sekcija is not None:
+        dijelovi.append(poruka("lokacija.sekcija", sekcija=lokacija.sekcija))
+    if lokacija.odlomak is not None:
+        dijelovi.append(poruka("lokacija.odlomak", odlomak=lokacija.odlomak))
+    opis = ", ".join(dijelovi)
+    return f"{opis}: „{lokacija.isjecak}…“" if lokacija.isjecak else opis
+
+
+def opis_izvora(izvor: "Izvor") -> str:
+    opis = poruka(f"izvor.{izvor.vrsta.value}")
+    return f"{opis} „{izvor.stil}“" if izvor.stil else opis
 
 
 def _decimalni_zarez(iznos: Decimal) -> str:

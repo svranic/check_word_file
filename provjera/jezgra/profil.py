@@ -11,12 +11,15 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    SerializeAsAny,
     StrictInt,
     ValidationError,
+    field_validator,
     model_validator,
 )
 
 from provjera.jezgra import jedinice
+from provjera.jezgra.pravila import REGISTAR, PostavkeBaza
 
 
 class GreskaProfila(Exception):
@@ -102,6 +105,30 @@ class Profil(_Odjeljak):
     naziv_datoteke: NazivDatoteke
     formula: ParametriFormule
     tolerancije: Tolerancije
+    pravila: dict[str, SerializeAsAny[PostavkeBaza]] = Field(
+        default_factory=dict, validate_default=True
+    )
+
+    @field_validator("pravila", mode="before")
+    @classmethod
+    def _postavke_iz_registra(cls, odjeljci: object) -> dict[str, PostavkeBaza]:
+        """Svaki ``[pravila.<ID>]`` validira klasa iz registra; nedostajući dobiva zadane."""
+        if not isinstance(odjeljci, dict):
+            raise ValueError("pravila mora biti tablica [pravila.<ID>]")
+        greske, rezultat = [], {}
+        for pravilo_id, odjeljak in odjeljci.items():
+            if pravilo_id not in REGISTAR:
+                greske.append(f"{pravilo_id}: nepoznato pravilo")
+                continue
+            try:
+                rezultat[pravilo_id] = REGISTAR[pravilo_id].postavke.model_validate(odjeljak)
+            except ValidationError as greska:
+                greske += [f"{pravilo_id}.{_opis_greske(g)}" for g in greska.errors()]
+        if greske:
+            raise ValueError("; ".join(greske))
+        for pravilo_id, pravilo in REGISTAR.items():
+            rezultat.setdefault(pravilo_id, pravilo.postavke())
+        return rezultat
 
     @model_validator(mode="after")
     def _tolerancija_manja_od_pola_koraka(self) -> "Profil":

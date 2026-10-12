@@ -69,11 +69,13 @@ def test_sve_greske_odjednom():
         ('raspon = "0,5 cm"', 'raspon = "0,45 cm"'),
         ('margine = "0,03 cm"', 'margine = "0,06 cm"'),
         ('margine = "0,03 cm"', "margine = 0.03"),
-        ("[tolerancije]", "[pravila.R-MARGINE]\nukljuceno = true\n[tolerancije]"),
+        ("[tolerancije]", "[pravila.R-NEPOSTOJECE]\nukljuceno = true\n[tolerancije]"),
         ("objavljeno = true", ""),
         ('osnovica_desno = "2,5 cm"', 'osnovica_desno = "0,5 cm"'),
         ('naslovnica = "2,5 cm"', 'naslovnica = "0 cm"'),
         ('raspon = "0,5 cm"', 'raspon = "1,1 cm"'),
+        ("ukljuceno = true", "ukljuceno = 5"),
+        ("ukljuceno = true", "ukljuceno = true\nnepoznato = 1"),
     ],
 )
 def test_neispravan_profil_baca_gresku_profila(staro, novo):
