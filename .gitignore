@@ -16,6 +16,12 @@ samples/
 !tests/**/*.doc
 !tests/**/*.pdf
 
+# BMAD alati i njihovi izlazi (planski dokumenti, specovi, sprint status)
+_bmad/
+_bmad-output/
+.claude/
+.agents/
+
 # Python
 .venv/
 __pycache__/
