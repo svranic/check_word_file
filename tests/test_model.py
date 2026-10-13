@@ -27,7 +27,7 @@ def test_uloge_sekcija():
 
 
 def test_model_ispravnog_rada_u_twipsima():
-    m = model.procitaj(ispravan(54, PROFIL))
+    m = model.procitaj(ispravan(54, PROFIL), PROFIL.uloge)
     naslovnica, tijelo = m.sekcije
     assert naslovnica.uloga is Uloga.NASLOVNICA and tijelo.uloga is Uloga.TIJELO
     assert (naslovnica.gore, naslovnica.lijevo) == (1417, 1417)
@@ -39,8 +39,8 @@ def test_model_ispravnog_rada_u_twipsima():
 
 
 def test_model_prepoznaje_zrcalne_margine_i_neprekinuto():
-    assert model.procitaj(VARIJANTE["zrcalne"](54, PROFIL)).zrcalne_margine
-    assert model.procitaj(VARIJANTE["neprekinuti_prijelom"](54, PROFIL)).sekcije[1].pocetak is TipPocetka.NEPREKINUTO
+    assert model.procitaj(VARIJANTE["zrcalne"](54, PROFIL), PROFIL.uloge).zrcalne_margine
+    assert model.procitaj(VARIJANTE["neprekinuti_prijelom"](54, PROFIL), PROFIL.uloge).sekcije[1].pocetak is TipPocetka.NEPREKINUTO
 
 
 def test_dokument_bez_dijelova_je_odbijen_kao_ostecen():
@@ -49,14 +49,14 @@ def test_dokument_bez_dijelova_je_odbijen_kao_ostecen():
         arhiva.writestr("[Content_Types].xml", b"<Types/>")
         arhiva.writestr("word/document.xml", b"<nije-xml")
     with pytest.raises(model.NeispravanDokument):
-        model.procitaj(spremnik.getvalue())
+        model.procitaj(spremnik.getvalue(), PROFIL.uloge)
     izvjestaj = provjeri(spremnik.getvalue(), PROFIL, KONTEKST)
     assert izvjestaj.odbijeno is RazlogOdbijanja.OSTECENA
     assert izvjestaj.nalazi == ()
 
 
 def test_nedostajuca_margina_je_neprovjerljiva():
-    m = model.procitaj(ispravan(54, PROFIL))
+    m = model.procitaj(ispravan(54, PROFIL), PROFIL.uloge)
     m = replace(m, sekcije=(m.sekcije[0], replace(m.sekcije[1], lijevo=None)))
     pravilo = REGISTAR["R-MARGINE"]
     nalazi = pravilo.funkcija(m, KONTEKST, PROFIL.pravila["R-MARGINE"], PROFIL)
@@ -105,7 +105,7 @@ def test_pejzaz_prema_dimenzijama_bez_atributa_orient():
         s.page_width, s.page_height = s.page_height, s.page_width
 
     sadrzaj = _s_promjenom(zamijeni)
-    assert model.procitaj(sadrzaj).sekcije[1].pejzazno
+    assert model.procitaj(sadrzaj, PROFIL.uloge).sekcije[1].pejzazno
     assert _kljucevi_koji_padaju(sadrzaj) == {"R-MARGINE.pejzazno"}
 
 
@@ -115,7 +115,7 @@ def test_orient_landscape_s_uspravnim_dimenzijama_nije_pejzaz():
     def samo_atribut(d):
         d.sections[1].orientation = WD_ORIENTATION.LANDSCAPE
 
-    assert not model.procitaj(_s_promjenom(samo_atribut)).sekcije[1].pejzazno
+    assert not model.procitaj(_s_promjenom(samo_atribut), PROFIL.uloge).sekcije[1].pejzazno
 
 
 @pytest.mark.parametrize(("val", "zrcalne"), [("0", False), ("false", False), ("off", False), ("true", True), ("1", True)])
@@ -128,7 +128,7 @@ def test_zrcalne_margine_prema_vrijednosti(val, zrcalne):
         element.set(qn("w:val"), val)
         d.settings.element.append(element)
 
-    assert model.procitaj(_s_promjenom(dodaj)).zrcalne_margine is zrcalne
+    assert model.procitaj(_s_promjenom(dodaj), PROFIL.uloge).zrcalne_margine is zrcalne
 
 
 def test_margina_tik_izvan_tolerancije_ne_prolazi():
@@ -148,7 +148,7 @@ def test_treca_sekcija_je_tijelo_s_individualnim_marginama():
     def dodaj_sekciju(d):
         d.add_section(WD_SECTION_START.NEW_PAGE)
 
-    m = model.procitaj(_s_promjenom(dodaj_sekciju))
+    m = model.procitaj(_s_promjenom(dodaj_sekciju), PROFIL.uloge)
     assert [s.uloga for s in m.sekcije] == [Uloga.NASLOVNICA, Uloga.TIJELO, Uloga.TIJELO]
     ocekivane = formula.margine(54, PROFIL.formula).u_twips()
     assert {s: getattr(m.sekcije[2], s) for s in ocekivane} == ocekivane

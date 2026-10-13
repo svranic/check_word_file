@@ -10,9 +10,16 @@ class Jedinica(Enum):
     POLUTOCKE = "polutocke"
     TEKST = "tekst"
     BOOL = "bool"
+    TOCKE = "tocke"  # twipsi prikazani u pt (razmaci odlomka)
+    RETCI = "retci"  # prored u 240-inama retka (pravilo „auto“)
+    PORAVNANJE = "poravnanje"  # vrijednost iz Poravnanje (npr. „obostrano“)
 
 
 TWIPS_PO_CM = Decimal(1440) / Decimal("2.54")
+TWIPS_PO_PT = 20
+RETCI_PO_RETKU = 240
+
+_BROJ = re.compile(r"^\s*([0-9]+(?:[.,][0-9]+)?)\s*$")
 
 _MJERA = re.compile(r"^\s*([0-9]+(?:[.,][0-9]+)?)\s*(cm|mm|pt)\s*$")
 
@@ -62,12 +69,31 @@ def parsiraj_velicinu_fonta(tekst: str) -> int:
     return int(polutocke)
 
 
+def parsiraj_retke(tekst: str) -> int:
+    """Višestruki prored „1,15“ → 240-ine retka (276); jednostruki „1“ → 240."""
+    pogodak = _BROJ.match(tekst) if isinstance(tekst, str) else None
+    if not pogodak:
+        raise ValueError(f"neispravan prored {tekst!r}; očekuje se broj redaka, npr. '1' ili '1,15'")
+    iznos = _cijeli(Decimal(pogodak[1].replace(",", ".")) * RETCI_PO_RETKU)
+    if iznos <= 0:
+        raise ValueError(f"prored {tekst!r} mora biti veći od nule")
+    return iznos
+
+
 def mm_u_twips(mm: int) -> int:
     return _cijeli(Decimal(mm) / 10 * TWIPS_PO_CM)
 
 
 def twips_u_cm(twips: int) -> Decimal:
     return Decimal(twips) / TWIPS_PO_CM
+
+
+def twips_u_pt(twips: int) -> Decimal:
+    return Decimal(twips) / TWIPS_PO_PT
+
+
+def retci_u_broj(retci: int) -> Decimal:
+    return Decimal(retci) / RETCI_PO_RETKU
 
 
 def unutar_tolerancije(a: int, b: int, tol: int) -> bool:

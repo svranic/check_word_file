@@ -17,6 +17,7 @@ from pydantic import (
 from provjera.jezgra import jedinice
 from provjera.jezgra.pravila import REGISTAR, PostavkeBaza
 from provjera.jezgra.formula import ParametriFormule, kanonski_json
+from provjera.jezgra.model.uloge import NaziviUloga
 from provjera.jezgra.tipovi import Duljina
 
 
@@ -57,6 +58,7 @@ class Profil(_Odjeljak):
     naziv_datoteke: NazivDatoteke
     formula: ParametriFormule
     tolerancije: Tolerancije
+    uloge: NaziviUloga
     pravila: dict[str, SerializeAsAny[PostavkeBaza]] = Field(
         default_factory=dict, validate_default=True
     )
@@ -76,10 +78,16 @@ class Profil(_Odjeljak):
                 rezultat[pravilo_id] = REGISTAR[pravilo_id].postavke.model_validate(odjeljak)
             except ValidationError as greska:
                 greske += [f"{pravilo_id}.{_opis_greske(g)}" for g in greska.errors()]
+        for pravilo_id, pravilo in REGISTAR.items():
+            if pravilo_id in rezultat or pravilo_id in odjeljci:
+                continue
+            try:
+                rezultat[pravilo_id] = pravilo.postavke()
+            except ValidationError:
+                # Pravilo bez zadanih vrijednosti (npr. R-TEKST) traži svoj odjeljak u profilu.
+                greske.append(f"{pravilo_id}: nedostaje odjeljak [pravila.{pravilo_id}]")
         if greske:
             raise ValueError("; ".join(greske))
-        for pravilo_id, pravilo in REGISTAR.items():
-            rezultat.setdefault(pravilo_id, pravilo.postavke())
         return rezultat
 
     @model_validator(mode="after")

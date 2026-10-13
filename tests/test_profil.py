@@ -32,6 +32,10 @@ def test_verzija_ne_ovisi_o_redoslijedu_ni_komentarima():
         "osnovica_dolje = \"2,5 cm\"\nosnovica_gore = \"2,5 cm\"\n"
         "[naziv_datoteke]\nnastavak = \".docx\"\nsufiks = \"_GiG_OG_Vjezba_1\"\n"
         "[vjezba]\nobjavljeno = true\nnaziv = \"Vježba 1\"\nid = \"vjezba_1\"\n"
+        "[pravila.R-TEKST]\nprored = \"1\"\nrazmak_iza = \"6 pt\"\nrazmak_ispred = \"6 pt\"\n"
+        "poravnanje = \"obostrano\"\nvelicina = \"12 pt\"\nfont = \"Calibri\"\nstil = \"Normal\"\n"
+        "[uloge]\npoglavlja = [\"Uvod\", \"Studij geodezije i geomatike u Varaždinu\", "
+        "\"Zaključak\", \"Literatura\"]\nliteratura = \"Literatura\"\nsazetak = \"Sažetak\"\n"
     )
     a = profil.ucitaj(izvorni.encode("utf-8"))
     b = profil.ucitaj(preuredeni.encode("utf-8"))
@@ -99,3 +103,41 @@ def test_objavljeni_preskace_neobjavljene_i_broji_neispravne():
 
 def test_ucitava_profil_s_bom():
     assert profil.ucitaj(b"\xef\xbb\xbf" + _vjezba_1().encode("utf-8")).vjezba.id == "vjezba_1"
+
+
+def test_r_tekst_i_uloge_dolaze_iz_profila():
+    p = profil.ucitaj(PROFIL_VJEZBE_1.read_bytes())
+    tekst = p.pravila["R-TEKST"]
+    assert (tekst.stil, tekst.font, tekst.velicina, tekst.poravnanje.value) == ("Normal", "Calibri", 24, "obostrano")
+    assert (tekst.razmak_ispred, tekst.razmak_iza, tekst.prored) == (120, 120, 240)
+    assert p.uloge.sazetak == "Sažetak" and p.uloge.literatura in p.uloge.poglavlja
+
+
+@pytest.mark.parametrize("odjeljak", ["[uloge]", "[pravila.R-TEKST]"])
+def test_bez_odjeljka_uloga_ili_r_teksta_profil_je_neispravan(odjeljak):
+    tekst = _vjezba_1()
+    pocetak = tekst.index(odjeljak)
+    kraj = tekst.find("\n[", pocetak + 1)
+    bez = tekst[:pocetak] + (tekst[kraj + 1:] if kraj != -1 else "")
+    with pytest.raises(profil.GreskaProfila):
+        profil.ucitaj(bez.encode("utf-8"))
+
+
+def test_neispravno_poravnanje_u_profilu():
+    with pytest.raises(profil.GreskaProfila):
+        profil.ucitaj(_vjezba_1().replace('poravnanje = "obostrano"', 'poravnanje = "koso"').encode("utf-8"))
+
+
+def test_iskljucen_r_tekst_ne_treba_ciljne_vrijednosti():
+    tekst = _vjezba_1()
+    pocetak = tekst.index("[pravila.R-TEKST]")
+    kraj = tekst.find("\n[", pocetak + 1)
+    bez = tekst[:pocetak] + "[pravila.R-TEKST]\nukljuceno = false\n" + (tekst[kraj + 1:] if kraj != -1 else "")
+    assert profil.ucitaj(bez.encode("utf-8")).pravila["R-TEKST"].ukljuceno is False
+    with pytest.raises(profil.GreskaProfila):
+        profil.ucitaj(bez.replace("ukljuceno = false", "ukljuceno = true").encode("utf-8"))
+
+
+def test_poravnanje_ostalo_nije_dopusteno_u_profilu():
+    with pytest.raises(profil.GreskaProfila):
+        profil.ucitaj(_vjezba_1().replace('poravnanje = "obostrano"', 'poravnanje = "ostalo"').encode("utf-8"))

@@ -42,14 +42,17 @@ def provjeri(docx: bytes, profil: Profil, kontekst: KontekstProvjere) -> Izvjest
         return Izvjestaj(razlog, (), verzija(profil), kontekst.rbr)
 
     # MemoryError je preopterećenje instance, ne svojstvo dokumenta: propušta se pozivatelju.
+    razlog_modela = None
     try:
-        dokument = model.procitaj(docx)
+        dokument = model.procitaj(docx, profil.uloge)
     except model.NeispravanDokument:
         return Izvjestaj(ulaz.RazlogOdbijanja.OSTECENA, (), verzija(profil), kontekst.rbr)
     except MemoryError:
         raise
-    except Exception:  # noqa: BLE001 — pravila koja trebaju model postaju neprovjerljiva
-        dokument = None
+    except model.NepodrzaniDokument as greska:
+        dokument, razlog_modela = None, str(greska)
+    except Exception as greska:  # noqa: BLE001 — pravila koja trebaju model postaju neprovjerljiva
+        dokument, razlog_modela = None, type(greska).__name__
 
     nalazi: list[Nalaz] = []
     for pravilo_id, pravilo in REGISTAR.items():
@@ -66,7 +69,9 @@ def provjeri(docx: bytes, profil: Profil, kontekst: KontekstProvjere) -> Izvjest
         except MemoryError:
             raise
         except Exception as greska:  # noqa: BLE001 — iznimka nikad ne smije dati prolaz
-            rezultat = [_neprovjerljivo(pravilo_id, type(greska).__name__)]
+            # Bez modela pravilo koje ga treba pada; razlog je ono što je model spriječilo.
+            razlog = razlog_modela if dokument is None else type(greska).__name__
+            rezultat = [_neprovjerljivo(pravilo_id, razlog)]
         nalazi += rezultat
     return Izvjestaj(None, tuple(nalazi), verzija(profil), kontekst.rbr)
 

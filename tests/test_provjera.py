@@ -160,7 +160,7 @@ def test_memory_error_u_pravilu_se_propusta(privremena_pravila):
 
 
 def test_greska_modela_ne_rusi_pravila_koja_ga_ne_trebaju(monkeypatch, privremena_pravila):
-    def neuspjeh(_):
+    def neuspjeh(*_):
         raise ValueError("model")
 
     monkeypatch.setattr("provjera.jezgra.model.procitaj", neuspjeh)
@@ -168,6 +168,8 @@ def test_greska_modela_ne_rusi_pravila_koja_ga_ne_trebaju(monkeypatch, privremen
     izvjestaj = provjeri(_docx(), PROFIL, _kontekst())
     assert status_pravila(izvjestaj.nalazi, "R-NAZIV") is Status.PROSLO
     assert status_pravila(izvjestaj.nalazi, "R-TREBA-MODEL") is Status.NEPROVJERLJIVO
+    [nalaz] = [n for n in izvjestaj.nalazi if n.pravilo_id == "R-TREBA-MODEL"]
+    assert nalaz.parametri["razlog"] == "ValueError"
 
 
 def test_profil_bez_odjeljka_pravila_dobiva_zadane_postavke():

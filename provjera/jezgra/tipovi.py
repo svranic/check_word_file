@@ -22,3 +22,9 @@ Duljina = Annotated[int, BeforeValidator(_mjera(jedinice.parsiraj_duljinu))]
 
 DuljinaMm = Annotated[int, BeforeValidator(_mjera(jedinice.parsiraj_mm))]
 """Duljina u cijelim milimetrima (formula margina)."""
+
+VelicinaFonta = Annotated[int, BeforeValidator(_mjera(jedinice.parsiraj_velicinu_fonta))]
+"""Veličina fonta u polutočkama („12 pt“ → 24)."""
+
+Retci = Annotated[int, BeforeValidator(_mjera(jedinice.parsiraj_retke))]
+"""Višestruki prored u 240-inama retka („1“ → 240, „1,15“ → 276)."""

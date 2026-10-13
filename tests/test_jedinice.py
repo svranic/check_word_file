@@ -60,3 +60,33 @@ def test_mm_u_twips_i_tolerancija():
 )
 def test_formatiraj(iznos, jedinica, tekst):
     assert formatiraj(iznos, jedinica) == tekst
+
+
+@pytest.mark.parametrize(("tekst", "retci"), [("1", 240), ("1,15", 276), ("1.5", 360), ("2", 480)])
+def test_parsiraj_retke(tekst, retci):
+    assert jedinice.parsiraj_retke(tekst) == retci
+
+
+@pytest.mark.parametrize("tekst", ["1 pt", "", "0", "0,001", "-1", 1])
+def test_parsiraj_retke_odbija(tekst):
+    with pytest.raises(ValueError):
+        jedinice.parsiraj_retke(tekst)
+
+
+@pytest.mark.parametrize(
+    ("iznos", "jedinica", "tekst"),
+    [
+        (120, Jedinica.TOCKE, "6 pt"),
+        (200, Jedinica.TOCKE, "10 pt"),
+        (240, Jedinica.RETCI, "jednostruko (Single)"),
+        (276, Jedinica.RETCI, "višestruko 1,15 (Multiple)"),
+        ("obostrano", Jedinica.PORAVNANJE, "obostrano (Justify)"),
+    ],
+)
+def test_formatiraj_jedinice_odlomka(iznos, jedinica, tekst):
+    assert formatiraj(iznos, jedinica) == tekst
+
+
+@pytest.mark.parametrize(("iznos", "tekst"), [(360, "1,5 retka (1.5 lines)"), (480, "dvostruko (Double)")])
+def test_formatiraj_prored_kao_word(iznos, tekst):
+    assert formatiraj(iznos, Jedinica.RETCI) == tekst

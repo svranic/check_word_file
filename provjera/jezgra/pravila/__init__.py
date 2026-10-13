@@ -4,6 +4,7 @@
 from provjera.jezgra.pravila import r_naziv  # noqa: F401
 from provjera.jezgra.pravila import r_sekcije  # noqa: F401
 from provjera.jezgra.pravila import r_margine  # noqa: F401
+from provjera.jezgra.pravila import r_tekst  # noqa: F401
 # isort: on
 from provjera.jezgra.pravila.osnova import REGISTAR, PostavkeBaza, Pravilo
 

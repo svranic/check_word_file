@@ -4,13 +4,14 @@ Ključevi pravila imaju oblik ``<pravilo_id>.<slucaj>`` (npr. ``R-NAZIV.prolazi`
 a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefiksu:
 ``app.``, ``nastavnik.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
 ``margine.``, ``naziv.``, ``ulaz.``, ``opce.``, ``status.``, ``izvjestaj.``,
-``lokacija.``, ``izvor.``, ``sazetak.`` i ``vrijednost.``.
+``lokacija.``, ``izvor.``, ``sazetak.``, ``poravnanje.``, ``prored.`` i ``vrijednost.``.
 """
 
 from collections.abc import Mapping
 from decimal import ROUND_HALF_UP, Decimal
 from types import MappingProxyType
-from provjera.jezgra.jedinice import Jedinica, twips_u_cm
+
+from provjera.jezgra.jedinice import Jedinica, RETCI_PO_RETKU, retci_u_broj, twips_u_cm, twips_u_pt
 from provjera.jezgra.nalaz import Izvor, Lokacija, Nalaz, Vrijednost
 
 KATALOG: Mapping[str, str] = MappingProxyType(
@@ -158,6 +159,67 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Dokument koristi zrcalne margine. U Prilagođenim marginama (Custom Margins) "
             "pod Više stranica (Multiple pages) odaberi Uobičajeno (Normal)."
         ),
+        "pravilo.R-TEKST": "Osnovni tekst",
+        "R-TEKST.prolazi": "Osnovni tekst je u stilu {stil} i ispravno je oblikovan.",
+        "R-TEKST.nema_teksta": (
+            "U radu nije pronađen osnovni tekst (odlomci ispod naslova poglavlja). "
+            "Provjeri jesu li naslovi poglavlja oblikovani stilom Naslov 1 (Heading 1) "
+            "i je li tekst poglavlja upisan ispod njih."
+        ),
+        "R-TEKST.drugi_stil": (
+            "Odlomak osnovnog teksta je u stilu „{pronadeno}“, a mora biti u stilu "
+            "„{stil}“, čak i kad izgleda jednako. Stavi kursor u odlomak i "
+            "odaberi Početna (Home) → Stilovi (Styles) → {stil}."
+        ),
+        "R-TEKST.font": (
+            "Font osnovnog teksta je {pronadeno}, a treba biti {ocekivano}. Font se mijenja "
+            "u stilu, ne ručno: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Formatting) → {ocekivano}. "
+            "Ako je font zadan ručno, označi tekst i pritisni Ctrl+Space."
+        ),
+        "R-TEKST.font_tema": (
+            "Font osnovnog teksta je {pronadeno}, a treba biti {ocekivano}. Stil ne navodi "
+            "font pa Word uzima font teme dokumenta (u novijim verzijama Aptos). Odaberi "
+            "Dizajn (Design) → Fontovi (Fonts) i skup u kojem je font tijela {ocekivano}, "
+            "ili zadaj font u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Formatting) → {ocekivano}."
+        ),
+        "R-TEKST.font_nepoznat": (
+            "Font osnovnog teksta trebao bi doći iz teme dokumenta, ali tema nije zapisana "
+            "u datoteci pa font nije moguće odrediti. Zadaj font izravno u stilu: "
+            "Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Formatting) → {ocekivano}."
+        ),
+        "R-TEKST.velicina": (
+            "Veličina fonta osnovnog teksta je {pronadeno}, a treba biti {ocekivano}. "
+            "Promijeni je u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Formatting) → {ocekivano}."
+        ),
+        "R-TEKST.poravnanje": (
+            "Poravnanje osnovnog teksta je {pronadeno}, a treba biti {ocekivano}. "
+            "Promijeni ga u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Format) → Odlomak (Paragraph) → "
+            "Poravnanje (Alignment)."
+        ),
+        "R-TEKST.razmak_ispred": (
+            "Razmak ispred odlomka osnovnog teksta je {pronadeno}, a treba biti {ocekivano}. "
+            "Promijeni ga u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Format) → Odlomak (Paragraph) → "
+            "Ispred (Before)."
+        ),
+        "R-TEKST.razmak_iza": (
+            "Razmak iza odlomka osnovnog teksta je {pronadeno}, a treba biti {ocekivano}. "
+            "Promijeni ga u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Format) → Odlomak (Paragraph) → "
+            "Iza (After)."
+        ),
+        "R-TEKST.prored": (
+            "Prored osnovnog teksta je {pronadeno}, a treba biti {ocekivano}. "
+            "Promijeni ga u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Format) → Odlomak (Paragraph) → "
+            "Prored (Line spacing)."
+        ),
+        "poravnanje.lijevo": "lijevo (Align Left)",
+        "poravnanje.sredina": "centrirano (Center)",
+        "poravnanje.desno": "desno (Align Right)",
+        "poravnanje.obostrano": "obostrano (Justify)",
+        "poravnanje.ostalo": "drugačije poravnanje",
+        "prored.jednostruko": "jednostruko (Single)",
+        "prored.1_5": "1,5 retka (1.5 lines)",
+        "prored.dvostruko": "dvostruko (Double)",
+        "prored.visestruko": "višestruko {retci} (Multiple)",
         "opce.neprovjerljivo": (
             "Ovo pravilo nije bilo moguće pouzdano provjeriti ({razlog}). "
             "Pitaj nastavnika da pregleda ovaj dio rada."
@@ -257,11 +319,23 @@ def _decimalni_zarez(iznos: Decimal) -> str:
 
 
 def formatiraj(iznos: int | str | bool, jedinica: Jedinica) -> str:
-    """Prikaz vrijednosti: twipsi kao cm s decimalnim zarezom, polutočke kao pt."""
+    """Prikaz vrijednosti: twipsi kao cm (razmaci kao pt), polutočke kao pt, prored u retcima."""
     if jedinica is Jedinica.TWIPS:
         return f"{_decimalni_zarez(twips_u_cm(iznos))} cm"
     if jedinica is Jedinica.POLUTOCKE:
         return f"{_decimalni_zarez(Decimal(iznos) / 2)} pt"
+    if jedinica is Jedinica.TOCKE:
+        return f"{_decimalni_zarez(twips_u_pt(iznos))} pt"
+    if jedinica is Jedinica.RETCI:
+        if iznos == RETCI_PO_RETKU:
+            return poruka("prored.jednostruko")
+        if iznos == RETCI_PO_RETKU * 3 // 2:
+            return poruka("prored.1_5")
+        if iznos == 2 * RETCI_PO_RETKU:
+            return poruka("prored.dvostruko")
+        return poruka("prored.visestruko", retci=_decimalni_zarez(retci_u_broj(iznos)))
+    if jedinica is Jedinica.PORAVNANJE:
+        return poruka(f"poravnanje.{iznos}")
     if jedinica is Jedinica.BOOL:
         return poruka("vrijednost.da" if iznos else "vrijednost.ne")
     return str(iznos)

@@ -29,6 +29,13 @@ margine = "0,03 cm"
 # Dopušteno odstupanje veličine stranice (A4).
 stranica = "0,1 cm"
 
+[uloge]
+# Nazivi se uspoređuju bez obzira na velika i mala slova, dijakritike i završnu
+# interpunkciju („UVOD:“ = „Uvod“); ručni broj („1.“) se zanemaruje.
+sazetak = "Sažetak"
+literatura = "Literatura"
+poglavlja = ["Uvod", "Studij geodezije i geomatike u Varaždinu", "Zaključak", "Literatura"]
+
 [pravila.R-NAZIV]
 ukljuceno = true
 
@@ -39,3 +46,16 @@ ukljuceno = true
 ukljuceno = true
 sirina_stranice = "21 cm"
 visina_stranice = "29,7 cm"
+
+[pravila.R-TEKST]
+ukljuceno = true
+# Stil se zadaje ugrađenim imenom neovisno o jeziku Worda (npr. "Normal").
+stil = "Normal"
+font = "Calibri"
+velicina = "12 pt"
+# lijevo | sredina | desno | obostrano
+poravnanje = "obostrano"
+razmak_ispred = "6 pt"
+razmak_iza = "6 pt"
+# Višestruki prored u retcima: "1" je jednostruko.
+prored = "1"

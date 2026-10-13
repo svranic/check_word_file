@@ -43,3 +43,9 @@ def test_svaki_primjer_ima_zapis_i_datoteku():
 @pytest.mark.skipif(not UZORAK.exists(), reason="stvarni uzorak postoji samo lokalno")
 def test_stvarni_uzorak_nema_naslovnicu_kao_sekciju():
     assert "R-SEKCIJE" in _padaju(UZORAK.read_bytes(), UZORAK.name)
+
+
+@pytest.mark.skipif(not UZORAK.exists(), reason="stvarni uzorak postoji samo lokalno")
+def test_stvarni_uzorak_prolazi_osnovni_tekst_unatoc_literaturi_u_list_paragraph():
+    izvjestaj = provjeri(UZORAK.read_bytes(), PROFIL, KontekstProvjere(UZORAK.name, OCEKIVANO["rbr"], None, None))
+    assert {n.status for n in izvjestaj.nalazi if n.pravilo_id == "R-TEKST"} == {Status.PROSLO}

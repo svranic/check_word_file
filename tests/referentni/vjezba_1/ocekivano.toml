@@ -33,3 +33,24 @@ padaju = ["R-MARGINE"]
 
 [primjeri.zrcalne]
 padaju = ["R-MARGINE"]
+
+[primjeri.tekst_font]
+padaju = ["R-TEKST"]
+
+[primjeri.tekst_velicina]
+padaju = ["R-TEKST"]
+
+[primjeri.tekst_poravnanje]
+padaju = ["R-TEKST"]
+
+[primjeri.tekst_razmak]
+padaju = ["R-TEKST"]
+
+[primjeri.tekst_prored]
+padaju = ["R-TEKST"]
+
+[primjeri.tekst_drugi_stil]
+padaju = ["R-TEKST"]
+
+[primjeri.tekst_aptos]
+padaju = ["R-TEKST"]

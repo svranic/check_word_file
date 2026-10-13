@@ -5,13 +5,17 @@ Pokretanje: ``uv run python tests/alati/generator.py`` zapisuje .docx primjere u
 """
 
 import io
+import re
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 
 import docx
 from docx.enum.section import WD_ORIENTATION, WD_SECTION_START
+from docx.enum.style import WD_STYLE_TYPE
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
-from docx.shared import Mm, Twips
+from docx.shared import Mm, Pt, Twips
 
 from provjera.jezgra import formula
 from provjera.jezgra.jedinice import mm_u_twips
@@ -46,22 +50,63 @@ def _tijelo(rbr: int, profil: Profil) -> dict[str, int]:
     return formula.margine(rbr, profil.formula).u_twips()
 
 
+def zamijeni_u_zipu(sadrzaj: bytes, zamjene: dict[str, Callable[[bytes], bytes | None]]) -> bytes:
+    """Prepisuje dijelove paketa; funkcija koja vrati ``None`` uklanja dio."""
+    ulaz, izlaz = zipfile.ZipFile(io.BytesIO(sadrzaj)), io.BytesIO()
+    with zipfile.ZipFile(izlaz, "w", zipfile.ZIP_DEFLATED) as novi:
+        for stavka in ulaz.infolist():
+            podaci = ulaz.read(stavka)
+            if stavka.filename in zamjene:
+                podaci = zamjene[stavka.filename](podaci)
+                if podaci is None:
+                    continue
+            novi.writestr(stavka, podaci)
+    return izlaz.getvalue()
+
+
+def _normal(dokument, profil: Profil) -> None:
+    """Stil Normal točno po [pravila.R-TEKST]; font je zapisan u stilu, ne preuzet iz teme."""
+    tekst = profil.pravila["R-TEKST"]
+    normal = dokument.styles["Normal"]
+    normal.font.name = tekst.font
+    normal.font.size = Pt(tekst.velicina / 2)
+    oblik = normal.paragraph_format
+    oblik.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    oblik.space_before = Twips(tekst.razmak_ispred)
+    oblik.space_after = Twips(tekst.razmak_iza)
+    oblik.line_spacing = tekst.prored / 240
+
+
+def _sadrzaj(dokument, profil: Profil) -> None:
+    """Sažetak, poglavlja u stilu Heading 1 s osnovnim tekstom i stavka literature."""
+    dokument.add_paragraph(profil.uloge.sazetak)
+    dokument.add_paragraph("Rad ukratko opisuje izbor studija i ciljeve studiranja.")
+    for poglavlje in profil.uloge.poglavlja:
+        dokument.add_heading(poglavlje, level=1)
+        if poglavlje == profil.uloge.literatura:
+            dokument.add_paragraph("Sveučilište Sjever, https://www.unin.hr/", style="List Paragraph")
+        else:
+            dokument.add_paragraph(f"Ovo je osnovni tekst poglavlja {poglavlje}.")
+            dokument.add_paragraph("Drugi odlomak osnovnog teksta istog poglavlja.")
+
+
 def _dokument(rbr: int, profil: Profil, jedna_sekcija: bool = False):
     dokument = docx.Document()
+    _normal(dokument, profil)
     naslovnica = dokument.sections[0]
     _a4(naslovnica)
     tijelo = _tijelo(rbr, profil)
     if jedna_sekcija:
         _margine(naslovnica, **tijelo)
         dokument.add_paragraph("Ana Horvat, 0000000000")
-        dokument.add_paragraph("Uvod")
+        _sadrzaj(dokument, profil)
         return dokument
     _margine(naslovnica, *(mm_u_twips(profil.formula.naslovnica),) * 4)
     dokument.add_paragraph("Ana Horvat, 0000000000")
     sekcija = dokument.add_section(WD_SECTION_START.NEW_PAGE)
     _a4(sekcija)
     _margine(sekcija, **tijelo)
-    dokument.add_paragraph("Uvod")
+    _sadrzaj(dokument, profil)
     return dokument
 
 
@@ -114,6 +159,54 @@ def _zrcalne(dokument, rbr, profil):
     dokument.settings.element.append(OxmlElement("w:mirrorMargins"))
 
 
+def _tekst_font(dokument, rbr, profil):
+    dokument.styles["Normal"].font.name = "Times New Roman"
+
+
+def _tekst_velicina(dokument, rbr, profil):
+    dokument.styles["Normal"].font.size = Pt(11)
+
+
+def _tekst_poravnanje(dokument, rbr, profil):
+    dokument.styles["Normal"].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+
+def _tekst_razmak(dokument, rbr, profil):
+    dokument.styles["Normal"].paragraph_format.space_after = Pt(10)
+
+
+def _tekst_prored(dokument, rbr, profil):
+    dokument.styles["Normal"].paragraph_format.line_spacing = 1.15
+
+
+def _prvi_osnovni(dokument):
+    """Prvi odlomak osnovnog teksta (iza prvog naslova poglavlja)."""
+    odlomci = dokument.paragraphs
+    prvi_naslov = next(i for i, o in enumerate(odlomci) if o.style.name == "Heading 1")
+    return odlomci[prvi_naslov + 1]
+
+
+def _tekst_drugi_stil(dokument, rbr, profil):
+    """Prilagođeni stil s istim svojstvima kao Normal ipak nije Normal."""
+    stil = dokument.styles.add_style("Moj tekst", WD_STYLE_TYPE.PARAGRAPH)
+    stil.base_style = dokument.styles["Normal"]
+    _prvi_osnovni(dokument).style = stil
+
+
+def tema_s_fontom(font: str) -> Callable[[bytes], bytes]:
+    def zamijeni(xml: bytes) -> bytes:
+        return re.sub(rb'(<a:minorFont>\s*<a:latin typeface=")[^"]*', rb"\g<1>" + font.encode(), xml)
+
+    return zamijeni
+
+
+def _tekst_aptos(rbr: int, profil: Profil) -> bytes:
+    """Normal bez fonta: Word uzima font teme (Aptos u novijim verzijama)."""
+    dokument = _dokument(rbr, profil)
+    dokument.styles["Normal"].font.name = None
+    return zamijeni_u_zipu(_spremi(dokument), {"word/theme/theme1.xml": tema_s_fontom("Aptos")})
+
+
 VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "ispravan": ispravan,
     "jedna_sekcija": lambda rbr, profil: _spremi(_dokument(rbr, profil, jedna_sekcija=True)),
@@ -125,6 +218,13 @@ VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "pejzazno": _izmijeni(_pejzazno),
     "gutter": _izmijeni(_gutter),
     "zrcalne": _izmijeni(_zrcalne),
+    "tekst_font": _izmijeni(_tekst_font),
+    "tekst_velicina": _izmijeni(_tekst_velicina),
+    "tekst_poravnanje": _izmijeni(_tekst_poravnanje),
+    "tekst_razmak": _izmijeni(_tekst_razmak),
+    "tekst_prored": _izmijeni(_tekst_prored),
+    "tekst_drugi_stil": _izmijeni(_tekst_drugi_stil),
+    "tekst_aptos": _tekst_aptos,
 }
 
 
