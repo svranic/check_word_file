@@ -34,6 +34,9 @@ def test_verzija_ne_ovisi_o_redoslijedu_ni_komentarima():
         "[vjezba]\nobjavljeno = true\nnaziv = \"Vježba 1\"\nid = \"vjezba_1\"\n"
         "[pravila.R-TEKST]\nprored = \"1\"\nrazmak_iza = \"6 pt\"\nrazmak_ispred = \"6 pt\"\n"
         "poravnanje = \"obostrano\"\nvelicina = \"12 pt\"\nfont = \"Calibri\"\nstil = \"Normal\"\n"
+        "[pravila.R-NASLOVI]\noznaka = \"{n}.\"\nrazmak_iza = \"6 pt\"\nrazmak_ispred = \"6 pt\"\n"
+        "poravnanje = \"lijevo\"\nvelicina = \"12 pt\"\npodebljano = true\nfont = \"Calibri\"\n"
+        "stil = \"Heading 1\"\n"
         "[uloge]\npoglavlja = [\"Uvod\", \"Studij geodezije i geomatike u Varaždinu\", "
         "\"Zaključak\", \"Literatura\"]\nliteratura = \"Literatura\"\nsazetak = \"Sažetak\"\n"
     )
@@ -113,7 +116,7 @@ def test_r_tekst_i_uloge_dolaze_iz_profila():
     assert p.uloge.sazetak == "Sažetak" and p.uloge.literatura in p.uloge.poglavlja
 
 
-@pytest.mark.parametrize("odjeljak", ["[uloge]", "[pravila.R-TEKST]"])
+@pytest.mark.parametrize("odjeljak", ["[uloge]", "[pravila.R-TEKST]", "[pravila.R-NASLOVI]"])
 def test_bez_odjeljka_uloga_ili_r_teksta_profil_je_neispravan(odjeljak):
     tekst = _vjezba_1()
     pocetak = tekst.index(odjeljak)

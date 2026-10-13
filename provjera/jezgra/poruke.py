@@ -211,6 +211,99 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Promijeni ga u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Format) → Odlomak (Paragraph) → "
             "Prored (Line spacing)."
         ),
+        "pravilo.R-NASLOVI": "Naslovi poglavlja",
+        "R-NASLOVI.prolazi": (
+            "Naslovi poglavlja su u stilu „{stil}“, ispravno su oblikovani i numerirani "
+            "Wordovom numeracijom."
+        ),
+        "R-NASLOVI.nedostaje": (
+            "U radu nije pronađeno poglavlje „{naziv}“. Dodaj naslov poglavlja i oblikuj "
+            "ga stilom: Početna (Home) → Stilovi (Styles) → {stil}."
+        ),
+        "R-NASLOVI.drugi_stil": (
+            "Naslov poglavlja je u stilu „{pronadeno}“, a mora biti u stilu „{stil}“, čak i "
+            "kad izgleda jednako. Ručno oblikovanje (podebljanje, veličina) samo mijenja izgled "
+            "teksta, a stil Wordu govori da je to naslov: o njemu ovise numeracija, sadržaj "
+            "(Table of Contents) i navigacija. Stavi kursor u naslov i odaberi Početna (Home) → "
+            "Stilovi (Styles) → {stil}."
+        ),
+        "R-NASLOVI.rucni_broj": (
+            "Broj naslova „{pronadeno}“ upisan je ručno. Obriši upisani broj i uključi Wordovu "
+            "numeraciju: stavi kursor u naslov i odaberi "
+            "Početna (Home) → Višerazinski popis (Multilevel List) → Definiraj novi višerazinski "
+            "popis (Define New Multilevel List): za razinu 1 postavi oblik broja „1.“ i "
+            "Poveži razinu sa stilom (Link level to style) „Naslov 1 (Heading 1)“."
+            " Wordova numeracija se sama ažurira kad dodaš, obrišeš ili premjestiš poglavlje."
+        ),
+        "R-NASLOVI.rucni_broj_uz_numeraciju": (
+            "Naslov „{pronadeno}“ ima ručno upisan broj, a Word već numerira taj naslov pa se "
+            "broj prikazuje dvaput. Obriši ručno upisani broj iz teksta naslova."
+        ),
+        "R-NASLOVI.bez_numeracije": (
+            "Naslov poglavlja nije numeriran Wordovom numeracijom. Stavi kursor u naslov i "
+            "odaberi "
+            "Početna (Home) → Višerazinski popis (Multilevel List) → Definiraj novi višerazinski "
+            "popis (Define New Multilevel List): za razinu 1 postavi oblik broja „1.“ i "
+            "Poveži razinu sa stilom (Link level to style) „Naslov 1 (Heading 1)“."
+            " Broj ne upisuj ručno."
+        ),
+        "R-NASLOVI.kriva_oznaka": (
+            "Naslov poglavlja ima oznaku „{pronadeno}“, a treba imati „{ocekivano}“. "
+            "Provjeri redoslijed i stil naslova, pa odaberi "
+            "Početna (Home) → Višerazinski popis (Multilevel List) → Definiraj novi višerazinski "
+            "popis (Define New Multilevel List): za razinu 1 postavi oblik broja „1.“ i "
+            "Poveži razinu sa stilom (Link level to style) „Naslov 1 (Heading 1)“."
+            " Ako numeracija ne kreće ispravno, desni klik na broj → Postavi vrijednost "
+            "numeriranja (Set Numbering Value)."
+        ),
+        "R-NASLOVI.sazetak_numeriran": (
+            "Naslov sažetka je numeriran („{pronadeno}“), a sažetak nije poglavlje i ne smije "
+            "imati broj. Stavi kursor u naslov sažetka i isključi numeraciju: Početna (Home) → "
+            "Numeriranje (Numbering) → Ništa (None), ili mu dodijeli stil bez numeracije."
+        ),
+        "R-NASLOVI.font": (
+            "Font naslova poglavlja je {pronadeno}, a treba biti {ocekivano}. Font se mijenja "
+            "u stilu, ne ručno: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → "
+            "Oblikovanje (Formatting) → {ocekivano}. Ako je font zadan ručno, označi naslov i "
+            "pritisni Ctrl+Space."
+        ),
+        "R-NASLOVI.font_tema": (
+            "Font naslova poglavlja je {pronadeno}, a treba biti {ocekivano}. Stil ne navodi "
+            "font pa Word uzima font naslova iz teme dokumenta. Zadaj font u stilu: Početna "
+            "(Home) → Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Formatting) → "
+            "{ocekivano}."
+        ),
+        "R-NASLOVI.font_nepoznat": (
+            "Font naslova poglavlja trebao bi doći iz teme dokumenta, ali tema nije zapisana u "
+            "datoteci pa font nije moguće odrediti. Zadaj font izravno u stilu: Početna (Home) → "
+            "Stilovi (Styles) → {stil} → Izmijeni (Modify) → Oblikovanje (Formatting) → {ocekivano}."
+        ),
+        "R-NASLOVI.podebljano": (
+            "Podebljano (Bold) za naslov poglavlja: {pronadeno}, a treba: {ocekivano}. "
+            "Promijeni ga u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni "
+            "(Modify) → Oblikovanje (Formatting) → Podebljano (Bold). Ako je zadano ručno, "
+            "označi naslov i pritisni Ctrl+Space."
+        ),
+        "R-NASLOVI.velicina": (
+            "Veličina fonta naslova poglavlja je {pronadeno}, a treba biti {ocekivano}. "
+            "Promijeni je u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni "
+            "(Modify) → Oblikovanje (Formatting) → {ocekivano}."
+        ),
+        "R-NASLOVI.poravnanje": (
+            "Poravnanje naslova poglavlja je {pronadeno}, a treba biti {ocekivano}. "
+            "Promijeni ga u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni "
+            "(Modify) → Oblikovanje (Format) → Odlomak (Paragraph) → Poravnanje (Alignment)."
+        ),
+        "R-NASLOVI.razmak_ispred": (
+            "Razmak ispred naslova poglavlja je {pronadeno}, a treba biti {ocekivano}. "
+            "Promijeni ga u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni "
+            "(Modify) → Oblikovanje (Format) → Odlomak (Paragraph) → Ispred (Before)."
+        ),
+        "R-NASLOVI.razmak_iza": (
+            "Razmak iza naslova poglavlja je {pronadeno}, a treba biti {ocekivano}. "
+            "Promijeni ga u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni "
+            "(Modify) → Oblikovanje (Format) → Odlomak (Paragraph) → Iza (After)."
+        ),
         "poravnanje.lijevo": "lijevo (Align Left)",
         "poravnanje.sredina": "centrirano (Center)",
         "poravnanje.desno": "desno (Align Right)",

@@ -54,3 +54,21 @@ padaju = ["R-TEKST"]
 
 [primjeri.tekst_aptos]
 padaju = ["R-TEKST"]
+
+[primjeri.naslovi_rucni_broj]
+padaju = ["R-NASLOVI"]
+
+[primjeri.naslovi_bez_numeracije]
+padaju = ["R-NASLOVI"]
+
+[primjeri.naslovi_drugi_stil]
+padaju = ["R-NASLOVI"]
+
+[primjeri.naslovi_nedostaje]
+padaju = ["R-NASLOVI"]
+
+[primjeri.naslovi_font]
+padaju = ["R-NASLOVI"]
+
+[primjeri.naslovi_sazetak_numeriran]
+padaju = ["R-NASLOVI"]

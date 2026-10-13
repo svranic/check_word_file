@@ -84,8 +84,10 @@ _WORD_PPR: dict[str, Any] = {
     "uvlaka_desno": 0,
     "uvlaka_prvi_red": 0,
     "numeriran": False,
+    "num_id": None,
+    "ilvl": None,
 }
-_WORD_RPR: dict[str, Any] = {"font": None, "velicina": 20}
+_WORD_RPR: dict[str, Any] = {"font": None, "velicina": 20, "podebljano": False}
 
 
 def _je_istina(element, atribut: str = "w:val") -> bool:
@@ -133,6 +135,13 @@ def iz_ppr(ppr) -> dict[str, Any]:
         broj = numeracija.find(qn("w:numId"))
         if broj is not None:
             van["numeriran"] = broj.get(qn("w:val"), "0") != "0"
+            van["num_id"] = broj.get(qn("w:val"), "0")
+        razina = numeracija.find(qn("w:ilvl"))
+        if razina is not None:
+            try:
+                van["ilvl"] = int(razina.get(qn("w:val"), "0"))
+            except ValueError:
+                pass
     return van
 
 
@@ -151,6 +160,9 @@ def iz_rpr(rpr) -> dict[str, Any]:
     velicina = rpr.find(qn("w:sz"))
     if velicina is not None and (iznos := _cijeli(velicina, "w:val")) is not None:
         van["velicina"] = iznos
+    podebljano = rpr.find(qn("w:b"))
+    if podebljano is not None:
+        van["podebljano"] = _je_istina(podebljano)
     return van
 
 
@@ -213,6 +225,28 @@ def _fontovi_teme(tema) -> dict[str, str | None]:
         if latin is not None and latin.get("typeface"):
             fontovi[vrsta] = latin.get("typeface")
     return fontovi
+
+
+def _zadnje_podebljano(razine: list[tuple[Izvor, Any]]) -> Efektivno[bool] | None:
+    zadnje = None
+    for izvor, rpr in razine:
+        if (vrijednost := iz_rpr(rpr).get("podebljano")) is not None:
+            zadnje = Efektivno(vrijednost, izvor)
+    return zadnje
+
+
+def _prebacivanje(odlomka: list, znaka: list) -> Efektivno[bool] | None:
+    """Podebljanje je svojstvo s prebacivanjem: stil odlomka XOR stil znaka.
+
+    Unutar ``basedOn`` lanca vrijedi zadnja zapisana vrijednost; bez ijedne u
+    stilovima ostaje vrijednost iz docDefaults (``None`` = bez promjene).
+    """
+    stil_odlomka, stil_znaka = _zadnje_podebljano(odlomka), _zadnje_podebljano(znaka)
+    if stil_odlomka is None and stil_znaka is None:
+        return None
+    vrijednost = bool(stil_odlomka and stil_odlomka.vrijednost) != bool(stil_znaka and stil_znaka.vrijednost)
+    izvor = (stil_znaka or stil_odlomka).izvor
+    return Efektivno(vrijednost, izvor)
 
 
 class Stilovi:
@@ -289,12 +323,14 @@ class Stilovi:
         kljuc = (stil_odlomka, stil_znaka)
         if kljuc not in self._rpr_stila:
             svojstva: dict[str, Efektivno] = {k: Efektivno(v, ZADANO) for k, v in _WORD_RPR.items()}
-            razine = [(ZADANO, self._zadani_rpr)]
-            razine += [(Izvor(VrstaIzvora.STIL, d.ime), d.rpr) for d in self._lanac(stil_odlomka, "paragraph")]
-            razine += [(Izvor(VrstaIzvora.STIL, d.ime), d.rpr) for d in self._lanac(stil_znaka, "character")]
-            for izvor, rpr in razine:
+            odlomka = [(Izvor(VrstaIzvora.STIL, d.ime), d.rpr) for d in self._lanac(stil_odlomka, "paragraph")]
+            znaka = [(Izvor(VrstaIzvora.STIL, d.ime), d.rpr) for d in self._lanac(stil_znaka, "character")]
+            for izvor, rpr in [(ZADANO, self._zadani_rpr), *odlomka, *znaka]:
                 for k, v in iz_rpr(rpr).items():
                     svojstva[k] = self._font(v, izvor) if k == "font" else Efektivno(v, izvor)
+            podebljano = _prebacivanje(odlomka, znaka)
+            if podebljano is not None:
+                svojstva["podebljano"] = podebljano
             self._rpr_stila[kljuc] = svojstva
         return self._rpr_stila[kljuc]
 

@@ -14,7 +14,8 @@ import docx
 from docx.enum.section import WD_ORIENTATION, WD_SECTION_START
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import OxmlElement
+from docx.oxml import OxmlElement, parse_xml
+from docx.oxml.ns import nsdecls, qn
 from docx.shared import Mm, Pt, Twips
 
 from provjera.jezgra import formula
@@ -77,6 +78,66 @@ def _normal(dokument, profil: Profil) -> None:
     oblik.line_spacing = tekst.prored / 240
 
 
+# Numeracija naslova poglavlja („1.“–„4.“) kroz stil Heading 1, kao Višerazinski popis u Wordu.
+NUM_ID_NASLOVA = "90"
+
+
+def _numeracija_naslova(dokument) -> None:
+    numbering = dokument.part.numbering_part.element
+    apstraktni = parse_xml(
+        f'<w:abstractNum {nsdecls("w")} w:abstractNumId="{NUM_ID_NASLOVA}">'
+        '<w:multiLevelType w:val="multilevel"/>'
+        '<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:pStyle w:val="Heading1"/>'
+        '<w:lvlText w:val="%1."/><w:lvlJc w:val="left"/></w:lvl>'
+        '<w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:pStyle w:val="Heading2"/>'
+        '<w:lvlText w:val="%1.%2."/><w:lvlJc w:val="left"/></w:lvl>'
+        "</w:abstractNum>"
+    )
+    # Svi w:abstractNum moraju biti ispred prvog w:num.
+    prvi_num = numbering.find(qn("w:num"))
+    if prvi_num is not None:
+        prvi_num.addprevious(apstraktni)
+    else:
+        numbering.append(apstraktni)
+    numbering.append(parse_xml(
+        f'<w:num {nsdecls("w")} w:numId="{NUM_ID_NASLOVA}"><w:abstractNumId w:val="{NUM_ID_NASLOVA}"/></w:num>'
+    ))
+
+
+def _heading1(dokument, profil: Profil) -> None:
+    """Stil Heading 1 točno po [pravila.R-NASLOVI], numeriran kroz stil (bez ilvl, preko pStyle)."""
+    naslovi = profil.pravila["R-NASLOVI"]
+    stil = dokument.styles["Heading 1"]
+    rpr = stil.element.get_or_add_rPr()
+    rfonts = rpr.get_or_add_rFonts()
+    # Font iz teme (majorHAnsi) imao bi prednost pred imenom fonta.
+    for atribut in ("w:asciiTheme", "w:hAnsiTheme"):
+        rfonts.attrib.pop(qn(atribut), None)
+    boja = rpr.find(qn("w:color"))
+    if boja is not None:
+        rpr.remove(boja)
+    stil.font.name = naslovi.font
+    stil.font.bold = naslovi.podebljano
+    stil.font.size = Pt(naslovi.velicina / 2)
+    oblik = stil.paragraph_format
+    oblik.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    oblik.space_before = Twips(naslovi.razmak_ispred)
+    oblik.space_after = Twips(naslovi.razmak_iza)
+    _numeracija_naslova(dokument)
+    stil.element.get_or_add_pPr().append(parse_xml(
+        f'<w:numPr {nsdecls("w")}><w:numId w:val="{NUM_ID_NASLOVA}"/></w:numPr>'
+    ))
+    # Shema traži numPr ispred spacing/jc: python-docx ga ne slaže sam.
+    ppr = stil.element.pPr
+    numpr = ppr.find(qn("w:numPr"))
+    ppr.remove(numpr)
+    sljedeci = next((e for e in ppr if e.tag in {qn("w:spacing"), qn("w:jc"), qn("w:outlineLvl")}), None)
+    if sljedeci is not None:
+        sljedeci.addprevious(numpr)
+    else:
+        ppr.append(numpr)
+
+
 def _sadrzaj(dokument, profil: Profil) -> None:
     """Sažetak, poglavlja u stilu Heading 1 s osnovnim tekstom i stavka literature."""
     dokument.add_paragraph(profil.uloge.sazetak)
@@ -93,6 +154,7 @@ def _sadrzaj(dokument, profil: Profil) -> None:
 def _dokument(rbr: int, profil: Profil, jedna_sekcija: bool = False):
     dokument = docx.Document()
     _normal(dokument, profil)
+    _heading1(dokument, profil)
     naslovnica = dokument.sections[0]
     _a4(naslovnica)
     tijelo = _tijelo(rbr, profil)
@@ -207,6 +269,52 @@ def _tekst_aptos(rbr: int, profil: Profil) -> bytes:
     return zamijeni_u_zipu(_spremi(dokument), {"word/theme/theme1.xml": tema_s_fontom("Aptos")})
 
 
+def _naslovi(dokument):
+    return [o for o in dokument.paragraphs if o.style.name == "Heading 1"]
+
+
+def _bez_numeracije_stila(dokument) -> None:
+    ppr = dokument.styles["Heading 1"].element.pPr
+    ppr.remove(ppr.find(qn("w:numPr")))
+
+
+def _naslovi_rucni_broj(dokument, rbr, profil):
+    """Brojevi upisani u tekst naslova umjesto Wordove numeracije."""
+    _bez_numeracije_stila(dokument)
+    for broj, naslov in enumerate(_naslovi(dokument), start=1):
+        naslov.runs[0].text = f"{broj}. {naslov.runs[0].text}"
+
+
+def _naslovi_bez_numeracije(dokument, rbr, profil):
+    _bez_numeracije_stila(dokument)
+
+
+def _naslov(dokument, profil, indeks: int):
+    naziv = profil.uloge.poglavlja[indeks]
+    return next(o for o in _naslovi(dokument) if o.text == naziv)
+
+
+def _naslovi_drugi_stil(dokument, rbr, profil):
+    """„Zaključak“ izgleda kao naslov (podebljano), ali je u stilu Normal."""
+    naslov = _naslov(dokument, profil, 2)
+    naslov.style = dokument.styles["Normal"]
+    naslov.runs[0].bold = True
+
+
+def _naslovi_nedostaje(dokument, rbr, profil):
+    naslov = _naslov(dokument, profil, 2)
+    naslov._p.getparent().remove(naslov._p)
+
+
+def _naslovi_font(dokument, rbr, profil):
+    dokument.styles["Heading 1"].font.name = "Times New Roman"
+
+
+def _naslovi_sazetak_numeriran(dokument, rbr, profil):
+    sazetak = next(o for o in dokument.paragraphs if o.text == profil.uloge.sazetak)
+    sazetak.style = dokument.styles["Heading 1"]
+
+
 VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "ispravan": ispravan,
     "jedna_sekcija": lambda rbr, profil: _spremi(_dokument(rbr, profil, jedna_sekcija=True)),
@@ -225,6 +333,12 @@ VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "tekst_prored": _izmijeni(_tekst_prored),
     "tekst_drugi_stil": _izmijeni(_tekst_drugi_stil),
     "tekst_aptos": _tekst_aptos,
+    "naslovi_rucni_broj": _izmijeni(_naslovi_rucni_broj),
+    "naslovi_bez_numeracije": _izmijeni(_naslovi_bez_numeracije),
+    "naslovi_drugi_stil": _izmijeni(_naslovi_drugi_stil),
+    "naslovi_nedostaje": _izmijeni(_naslovi_nedostaje),
+    "naslovi_font": _izmijeni(_naslovi_font),
+    "naslovi_sazetak_numeriran": _izmijeni(_naslovi_sazetak_numeriran),
 }
 
 

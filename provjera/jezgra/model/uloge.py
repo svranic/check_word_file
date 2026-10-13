@@ -57,7 +57,8 @@ def uloge_sekcija(broj: int) -> tuple[Uloga, ...]:
     return (Uloga.TIJELO,) * broj
 
 
-_RUCNI_BROJ = re.compile(r"^\s*\d+(?:\.\d+)*\.?\s*")
+# Broj mora završiti točkom ili razmakom: „3D modeliranje“ nije ručni broj.
+_RUCNI_BROJ = re.compile(r"^\s*\d+(?:\.\d+)*(?:\.\s*|\s+)")
 _ZAVRSNA_INTERPUNKCIJA = re.compile(r"[\s.,:;!?…\-–—]+$")
 _RAZMACI = re.compile(r"\s+")
 
@@ -72,8 +73,14 @@ def normaliziraj_naziv(tekst: str) -> str:
     return _ZAVRSNA_INTERPUNKCIJA.sub("", tekst)
 
 
-def _bez_rucnog_broja(tekst: str) -> str:
+def bez_rucnog_broja(tekst: str) -> str:
+    """Tekst bez ručno upisanog broja na početku („1. Uvod“ → „Uvod“)."""
     return _RUCNI_BROJ.sub("", tekst, count=1)
+
+
+def ima_rucni_broj(tekst: str) -> bool:
+    """Počinje li tekst ručno upisanim brojem („1.“, „2.1“); isti regex kao za uloge."""
+    return _RUCNI_BROJ.match(tekst) is not None
 
 
 _TOC = re.compile(r"^TOC(?:\d|Heading$)")
@@ -103,7 +110,7 @@ def uloge_odlomaka(
     vidjeno_poglavlje = False
     u_literaturi = False
     for z in znacajke:
-        naziv = normaliziraj_naziv(_bez_rucnog_broja(z.tekst))
+        naziv = normaliziraj_naziv(bez_rucnog_broja(z.tekst))
         if z.uloga_sekcije is Uloga.NASLOVNICA:
             uloga = UlogaOdlomka.NASLOVNICA
         elif z.u_tablici:

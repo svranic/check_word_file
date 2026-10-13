@@ -59,3 +59,18 @@ razmak_ispred = "6 pt"
 razmak_iza = "6 pt"
 # Višestruki prored u retcima: "1" je jednostruko.
 prored = "1"
+
+[pravila.R-NASLOVI]
+ukljuceno = true
+# Naslovi poglavlja iz [uloge] poglavlja. Stil se mora zadati ugrađenim engleskim imenom
+# ("Heading 1"); lokalizirano ime („Naslov 1“) ovdje ne odgovara. U dokumentu vrijedi i „Naslov 1“.
+stil = "Heading 1"
+font = "Calibri"
+podebljano = true
+velicina = "12 pt"
+# lijevo | sredina | desno | obostrano
+poravnanje = "lijevo"
+razmak_ispred = "6 pt"
+razmak_iza = "6 pt"
+# Wordova numeracija naslova; {n} je redni broj naslova u stilu iz profila, redom u dokumentu.
+oznaka = "{n}."

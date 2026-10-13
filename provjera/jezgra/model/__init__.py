@@ -16,6 +16,7 @@ from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml.ns import qn
 from docx.oxml.parser import parse_xml
 
+from provjera.jezgra.model.numeracija import Brojaci, Numeracija
 from provjera.jezgra.model.stilovi import (
     Efektivno,
     Poravnanje,
@@ -38,6 +39,7 @@ __all__ = [
     "Efektivno",
     "NeispravanDokument",
     "NepodrzaniDokument",
+    "Numeracija",
     "Odlomak",
     "Poravnanje",
     "PraviloProreda",
@@ -99,6 +101,7 @@ class Run:
     tekst: str
     font: Efektivno[str | None]
     velicina: Efektivno[int]
+    podebljano: Efektivno[bool]
 
 
 @dataclass(frozen=True)
@@ -119,6 +122,8 @@ class Odlomak:
     uvlaka_lijevo: Efektivno[int]
     uvlaka_desno: Efektivno[int]
     uvlaka_prvi_red: Efektivno[int]
+    # Vrijednost None znači da odlomak nije numeriran; izvor je izvor numId.
+    numeracija: Efektivno[Numeracija | None]
     runovi: tuple[Run, ...] = ()
 
 
@@ -261,7 +266,7 @@ def _odlomak(p, sekcija: int, u_tablici: bool, u_sadrzaju: bool, stilovi: Stilov
             continue
         rpr = r.find(qn("w:rPr"))
         svojstva = stilovi.rpr_runa(stil_id, _val(rpr, qn("w:rStyle")), rpr)
-        runovi.append(Run(tekst, svojstva["font"], svojstva["velicina"]))
+        runovi.append(Run(tekst, svojstva["font"], svojstva["velicina"], svojstva["podebljano"]))
     return _Sirovi(
         sekcija=sekcija,
         stil_id=stil_id,
@@ -289,6 +294,25 @@ def _stilovi(dokument) -> Stilovi:
     return Stilovi(dio_stilova.element if dio_stilova is not None else None, tema)
 
 
+def _brojaci(dokument) -> Brojaci:
+    dio = _dio(dokument, RT.NUMBERING)
+    if dio is None:
+        return Brojaci(None)
+    element = getattr(dio, "element", None)
+    return Brojaci(element if element is not None else parse_xml(dio.blob))
+
+
+def _numeracije(sirovi: list[_Sirovi], brojaci: Brojaci) -> list[Efektivno[Numeracija | None]]:
+    """Brojači teku redom dokumenta preko svih odlomaka (i u tablicama i na naslovnici)."""
+    return [
+        Efektivno(
+            brojaci.sljedeca(s.svojstva["num_id"].vrijednost, s.svojstva["ilvl"].vrijednost, s.stil_id),
+            s.svojstva["num_id"].izvor,
+        )
+        for s in sirovi
+    ]
+
+
 def _odlomci(dokument, uloge_sek: tuple[Uloga, ...], nazivi: NaziviUloga) -> tuple[Odlomak, ...]:
     stilovi = _stilovi(dokument)
     tijelo = dokument.element.body
@@ -312,6 +336,7 @@ def _odlomci(dokument, uloge_sek: tuple[Uloga, ...], nazivi: NaziviUloga) -> tup
         for s in sirovi
     ]
     uloge = uloge_odlomaka(znacajke, nazivi)
+    numeracije = _numeracije(sirovi, _brojaci(dokument))
     return tuple(
         Odlomak(
             indeks=i + 1,
@@ -328,9 +353,10 @@ def _odlomci(dokument, uloge_sek: tuple[Uloga, ...], nazivi: NaziviUloga) -> tup
             uvlaka_lijevo=s.svojstva["uvlaka_lijevo"],
             uvlaka_desno=s.svojstva["uvlaka_desno"],
             uvlaka_prvi_red=s.svojstva["uvlaka_prvi_red"],
+            numeracija=numeracija,
             runovi=s.runovi,
         )
-        for i, (s, uloga) in enumerate(zip(sirovi, uloge))
+        for i, (s, uloga, numeracija) in enumerate(zip(sirovi, uloge, numeracije))
     )
 
 
