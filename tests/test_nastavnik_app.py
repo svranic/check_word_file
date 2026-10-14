@@ -386,7 +386,9 @@ def test_neuspjelo_zamrzavanje_prikazuje_poruku(u_mapi, podaci, monkeypatch):
         raise PermissionError("datoteka je zaključana")
 
     at = _ucitaj(u_mapi, izvoz(ISPRAVNI))
+    # Pada i tvrda poveznica i zamjensko ekskluzivno stvaranje (npr. zaključana mapa).
     monkeypatch.setattr(popis_modul.os, "link", pukni)
+    monkeypatch.setattr(popis_modul, "_stvori_iskljucivo", pukni)
     at = at.button(key="zamrzni").click().run()
     assert not at.exception
     assert poruka("nastavnik.zapis_neuspio") in _greske(at)
