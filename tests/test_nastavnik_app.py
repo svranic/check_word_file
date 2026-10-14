@@ -18,7 +18,7 @@ from streamlit.testing.v1 import AppTest
 
 from provjera.adapteri import popis as popis_modul
 from provjera.adapteri.popis import Student, procitaj_zamrznuti, spremi, ucitaj_isvu, zamrzni
-from provjera.jezgra import profil
+from provjera.jezgra import formula, profil
 from provjera.jezgra.poruke import poruka
 
 KORIJEN = Path(__file__).resolve().parents[1]
@@ -55,15 +55,29 @@ def u_mapi(aplikacija, podaci):
     return aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
 
 
-def _profil(id_vjezbe: str, naziv: str, objavljeno: bool) -> profil.Profil:
-    p = profil.ucitaj(VJEZBA_1.read_bytes())
-    return p.model_copy(
-        update={
-            "vjezba": p.vjezba.model_copy(
-                update={"id": id_vjezbe, "naziv": naziv, "objavljeno": objavljeno}
-            )
-        }
+def _zamijeni(sadrzaj: bytes, staro: bytes, novo: bytes) -> bytes:
+    assert staro in sadrzaj
+    return sadrzaj.replace(staro, novo)
+
+
+def _toml(id_vjezbe: str, naziv: str, objavljeno: bool) -> bytes:
+    sadrzaj = _zamijeni(VJEZBA_1.read_bytes(), b'id = "vjezba_1"', f'id = "{id_vjezbe}"'.encode())
+    sadrzaj = _zamijeni(sadrzaj, 'naziv = "Vježba 1"'.encode(), f'naziv = "{naziv}"'.encode())
+    return _zamijeni(
+        sadrzaj, b"objavljeno = true", f"objavljeno = {str(objavljeno).lower()}".encode()
     )
+
+
+# Dvije greške: prazan naziv vježbe i negativno sjeme formule.
+NEISPRAVAN_TOML = _zamijeni(
+    _toml("vjezba_8", "", True), b"sjeme = 20261012", b"sjeme = -1"
+)
+
+
+def _profili(monkeypatch, datoteke: list[tuple[str, bytes]]) -> None:
+    """Mapa profila sadrži točno ``datoteke`` (ime, sadržaj); parsira ih stvarni ``ucitaj_sve``."""
+    pravi = profil.ucitaj_sve
+    monkeypatch.setattr(profil, "ucitaj_sve", lambda _imenovani: pravi(datoteke))
 
 
 def test_prikazuje_podatkovnu_mapu_i_odabir_vjezbe(aplikacija):
@@ -73,7 +87,8 @@ def test_prikazuje_podatkovnu_mapu_i_odabir_vjezbe(aplikacija):
     assert at.text_input(key="podatkovna_mapa").value == str(Path.home() / "ProvjeraWord")
     assert at.selectbox(key="vjezba").options == ["Vježba 1"]
     assert at.file_uploader
-    assert not at.warning
+    # Jedino upozorenje: vježba nije spremna jer još nema zamrznutog popisa.
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
 
 
 @pytest.mark.parametrize("mapa", [".", "podaci", "tests/../podaci/x"])
@@ -87,7 +102,7 @@ def test_mapa_u_repozitoriju_zaustavlja_stranicu(aplikacija, mapa):
 
 def test_mapa_izvan_repozitorija_je_prihvacena(aplikacija, tmp_path):
     at = aplikacija.text_input(key="podatkovna_mapa").input(str(tmp_path / "Provjera")).run()
-    assert not at.warning
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
     assert at.selectbox(key="vjezba")
 
 
@@ -97,34 +112,142 @@ def test_prazna_mapa_zaustavlja_stranicu(aplikacija):
     assert not at.selectbox
 
 
-def test_nudi_i_neobjavljene_vjezbe_te_broji_neispravne(monkeypatch):
-    profili = [_profil("vjezba_1", "Vježba 1", True), _profil("vjezba_2", "Vježba 2", False)]
-    monkeypatch.setattr(profil, "svi", lambda _sadrzaji: (profili, 2))
+def test_nudi_i_neobjavljene_i_neispravne_vjezbe(monkeypatch):
+    _profili(
+        monkeypatch,
+        [
+            ("a_neispravan.toml", NEISPRAVAN_TOML),
+            ("vjezba_1.toml", _toml("vjezba_1", "Vježba 1", True)),
+            ("vjezba_2.toml", _toml("vjezba_2", "Vježba 2", False)),
+            ("z_duplikat.toml", _toml("vjezba_1", "Kopija", True)),
+        ],
+    )
     at = AppTest.from_file(NASTAVNIK, default_timeout=30).run()
     assert not at.exception
+    # Ispravni prvi, da zadani odabir bude upotrebljiv; neispravni pod imenom datoteke.
     assert at.selectbox(key="vjezba").options == [
         "Vježba 1",
         poruka("nastavnik.vjezba_neobjavljena", naziv="Vježba 2"),
+        poruka("nastavnik.profil_neispravan", datoteka="a_neispravan.toml"),
+        poruka("nastavnik.profil_neispravan", datoteka="z_duplikat.toml"),
     ]
-    assert [w.value for w in at.warning] == [poruka("nastavnik.neispravni_profili", broj=2)]
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert at.file_uploader
 
 
-def test_bez_ispravnih_profila(monkeypatch):
-    monkeypatch.setattr(profil, "svi", lambda _sadrzaji: ([], 1))
+def test_neispravan_profil_prikazuje_sve_greske_i_zaustavlja(monkeypatch):
+    _profili(monkeypatch, [("a_neispravan.toml", NEISPRAVAN_TOML)])
     at = AppTest.from_file(NASTAVNIK, default_timeout=30).run()
-    assert [e.value for e in at.error] == [poruka("nastavnik.nema_profila")]
+    assert not at.exception
+    assert at.selectbox(key="vjezba").options == [
+        poruka("nastavnik.profil_neispravan", datoteka="a_neispravan.toml")
+    ]
+    assert [e.value.replace("\\", "") for e in at.error] == [
+        poruka("nastavnik.profil_greske", datoteka="a_neispravan.toml", broj=2)
+    ]
+    [greske] = [m.value.replace("\\", "") for m in at.markdown]
+    redci = greske.splitlines()
+    assert len(redci) == 2
+    assert any(r.startswith("- vjezba.naziv:") for r in redci)
+    assert any(r.startswith("- formula.sjeme:") for r in redci)
+    # Ostatak stranice se ne prikazuje.
+    assert not at.subheader
     assert not at.file_uploader
 
 
-def test_svi_ukljucuje_neobjavljene_i_broji_duplikate():
-    objavljen = VJEZBA_1.read_bytes()
-    neobjavljen = objavljen.replace(b"objavljeno = true", b"objavljeno = false")
-    assert neobjavljen != objavljen
-    drugi = neobjavljen.replace(b'id = "vjezba_1"', b'id = "vjezba_9"')
-    assert drugi != neobjavljen
-    profili, neispravnih = profil.svi([objavljen, drugi, neobjavljen, b"nije toml ["])
-    assert [p.vjezba.id for p in profili] == ["vjezba_1", "vjezba_9"]
-    assert neispravnih == 2
+def test_dupli_id_prikazuje_gresku_kljuca(monkeypatch):
+    _profili(
+        monkeypatch,
+        [
+            ("vjezba_1.toml", _toml("vjezba_1", "Vježba 1", True)),
+            ("z_duplikat.toml", _toml("vjezba_1", "Kopija", True)),
+        ],
+    )
+    at = AppTest.from_file(NASTAVNIK, default_timeout=30).run()
+    at = at.selectbox(key="vjezba").set_value("z_duplikat.toml").run()
+    assert not at.exception
+    assert [e.value.replace("\\", "") for e in at.error] == [
+        poruka("nastavnik.profil_greske", datoteka="z_duplikat.toml", broj=1)
+    ]
+    assert "vjezba.id:" in at.markdown[0].value.replace("\\", "")
+    assert not at.file_uploader
+
+
+def test_ucitaj_sve_vraca_profil_ili_gresku():
+    ispravan = VJEZBA_1.read_bytes()
+    rezultat = profil.ucitaj_sve(
+        [("a.toml", ispravan), ("b.toml", NEISPRAVAN_TOML), ("c.toml", ispravan)]
+    )
+    assert [ime for ime, _ in rezultat] == ["a.toml", "b.toml", "c.toml"]
+    assert isinstance(rezultat[0][1], profil.Profil)
+    assert isinstance(rezultat[1][1], profil.GreskaProfila)
+    assert len(rezultat[1][1].greske) == 2
+    assert isinstance(rezultat[2][1], profil.GreskaProfila)
+    assert rezultat[2][1].greske == (poruka("profil.dupli_id", datoteka="a.toml"),)
+    assert rezultat[2][1].greske[0].startswith("vjezba.id:")
+
+
+def test_ucitaj_sve_dupli_id_zadrzava_jedini_objavljeni():
+    nacrt = _toml("vjezba_1", "Nacrt", False)
+    objavljen = _toml("vjezba_1", "Vježba 1", True)
+    rezultat = dict(profil.ucitaj_sve([("a_nacrt.toml", nacrt), ("b_ziva.toml", objavljen)]))
+    assert isinstance(rezultat["b_ziva.toml"], profil.Profil)
+    assert rezultat["a_nacrt.toml"].greske == (
+        poruka("profil.dupli_id", datoteka="b_ziva.toml"),
+    )
+
+
+@pytest.mark.parametrize("objavljeno", [True, False])
+def test_ucitaj_sve_dupli_id_bez_jedinog_objavljenog_zadrzava_prvi(objavljeno):
+    prvi = _toml("vjezba_1", "Prvi", objavljeno)
+    drugi = _toml("vjezba_1", "Drugi", objavljeno)
+    rezultat = dict(profil.ucitaj_sve([("a.toml", prvi), ("b.toml", drugi)]))
+    assert isinstance(rezultat["a.toml"], profil.Profil)
+    assert rezultat["b.toml"].greske == (poruka("profil.dupli_id", datoteka="a.toml"),)
+
+
+def test_stvarna_mapa_profila_s_neispravnom_i_necitljivom(tmp_path, monkeypatch):
+    """Kopija aplikacije u ``tmp_path/app/apps``: njezin ``MAPA_PROFILA`` je ``tmp_path/app/profili``.
+
+    Skripta se pod AppTestom izvodi iznova, pa se globalni ``MAPA_PROFILA`` ne može
+    monkeypatchati; kopija daje stvarnu privremenu mapu profila bez izmjene koda.
+    """
+    korijen = tmp_path / "app"
+    (korijen / "apps").mkdir(parents=True)
+    (korijen / "apps" / "nastavnik.py").write_bytes(Path(NASTAVNIK).read_bytes())
+    mapa = korijen / "profili"
+    mapa.mkdir()
+    (mapa / "vjezba_1.toml").write_bytes(VJEZBA_1.read_bytes())
+    (mapa / "pokvaren.toml").write_bytes(NEISPRAVAN_TOML)
+    (mapa / "zakljucan.toml").write_bytes(VJEZBA_1.read_bytes())
+    pravi = Path.read_bytes
+
+    def read_bytes(self):
+        if self.name == "zakljucan.toml":
+            raise PermissionError(13, "Pristup odbijen")
+        return pravi(self)
+
+    monkeypatch.setattr(Path, "read_bytes", read_bytes)
+    at = AppTest.from_file(str(korijen / "apps" / "nastavnik.py"), default_timeout=30).run()
+    assert not at.exception
+    assert at.selectbox(key="vjezba").options == [
+        "Vježba 1",
+        poruka("nastavnik.profil_neispravan", datoteka="pokvaren.toml"),
+        poruka("nastavnik.profil_neispravan", datoteka="zakljucan.toml"),
+    ]
+    at = at.selectbox(key="vjezba").set_value("zakljucan.toml").run()
+    assert not at.exception
+    assert [m.value.replace("\\", "") for m in at.markdown] == [
+        "- " + poruka("profil.necitljiv", razlog="Pristup odbijen")
+    ]
+    assert not at.file_uploader
+
+
+def test_bez_profila(monkeypatch):
+    _profili(monkeypatch, [])
+    at = AppTest.from_file(NASTAVNIK, default_timeout=30).run()
+    assert [e.value for e in at.error] == [poruka("nastavnik.nema_profila")]
+    assert not at.file_uploader
 
 
 def _ucitaj(at: AppTest, sadrzaj: bytes) -> AppTest:
@@ -440,3 +563,81 @@ def test_imena_se_prikazuju_bez_markdowna(podaci, aplikacija):
     tekst = _tekst(at)
     assert r"\*Mia\* \[x\]\(y\)" in tekst
     assert "*Mia*" not in tekst.replace(r"\*Mia\*", "")
+
+
+# --- Spremnost (priča 3.3) ----------------------------------------------------
+
+
+def _sintetski_popis(rbrovi, aktivan=True) -> tuple[Student, ...]:
+    return tuple(
+        Student(rbr=r, jmbag=f"{9900000000 + r}", ime="Ana", prezime=f"Testić{r}", aktivan=aktivan)
+        for r in rbrovi
+    )
+
+
+def test_spremnost_spremno(podaci, aplikacija):
+    spremi(_sintetski_popis(range(1, 79)), _popis_csv(podaci))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    assert not at.exception
+    assert poruka("spremnost.naslov") in [s.value for s in at.subheader]
+    vjezba = profil.ucitaj(VJEZBA_1.read_bytes())
+    tekst = _tekst(at).replace("\\", "")
+    assert poruka("spremnost.profil", naziv="Vježba 1", verzija=profil.verzija(vjezba)) in tekst
+    assert poruka("spremnost.aktivnih", broj=78) in tekst
+    ukljucenih = sum(p.ukljuceno for p in vjezba.pravila.values())
+    assert poruka("spremnost.pravila", broj=ukljucenih, ukupno=len(vjezba.pravila)) in tekst
+    assert "✅ " + poruka("spremnost.margine_jedinstvene") in tekst
+    [status] = [s for s in at.success if s.value == poruka("spremnost.spremno")]
+    assert status.icon == "✅"
+    assert not at.error
+
+
+def test_spremnost_bez_popisa(u_mapi):
+    at = u_mapi
+    [status] = at.warning
+    assert status.value == poruka("spremnost.nije_spremno", broj=1)
+    assert status.icon == "❌"
+    assert "- " + poruka("spremnost.nema_popisa") in _tekst(at)
+    assert poruka("spremnost.margine_neprovjerene") in _tekst(at)
+    assert not at.success
+    assert not at.error  # „nije spremno“ je upozorenje, ne greška
+
+
+def test_spremnost_prevelik_rbr(podaci, aplikacija):
+    najveci = formula.najveci_rbr(profil.ucitaj(VJEZBA_1.read_bytes()).formula)
+    spremi(_sintetski_popis([1, 2, najveci + 1]), _popis_csv(podaci))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    assert not at.exception
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    ocekivano = poruka("spremnost.rbr_izvan_raspona", rbrovi=str(najveci + 1), najveci=najveci)
+    assert "- " + ocekivano in _tekst(at)
+
+
+def test_spremnost_bez_aktivnih(podaci, aplikacija):
+    spremi(_sintetski_popis([1, 2], aktivan=False), _popis_csv(podaci))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert "- " + poruka("spremnost.nema_aktivnih") in _tekst(at)
+
+
+def test_spremnost_sva_pravila_iskljucena(podaci, monkeypatch):
+    bez_pravila = _zamijeni(VJEZBA_1.read_bytes(), b"ukljuceno = true", b"ukljuceno = false")
+    _profili(monkeypatch, [("vjezba_1.toml", bez_pravila)])
+    spremi(_sintetski_popis([1, 2]), _popis_csv(podaci))
+    at = AppTest.from_file(NASTAVNIK, default_timeout=30).run()
+    at = at.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    assert not at.exception
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert "- " + poruka("spremnost.nema_pravila") in _tekst(at)
+
+
+def test_spremnost_neaktivni_rbr_izvan_raspona(podaci, aplikacija):
+    najveci = formula.najveci_rbr(profil.ucitaj(VJEZBA_1.read_bytes()).formula)
+    studenti = _sintetski_popis([1]) + _sintetski_popis([najveci + 1], aktivan=False)
+    spremi(studenti, _popis_csv(podaci))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    assert not at.exception
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    ocekivano = poruka("spremnost.rbr_izvan_raspona", rbrovi=str(najveci + 1), najveci=najveci)
+    assert "- " + ocekivano in _tekst(at)
+    assert poruka("spremnost.aktivnih", broj=1) in _tekst(at)

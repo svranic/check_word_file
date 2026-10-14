@@ -18,6 +18,7 @@ from provjera.jezgra import jedinice
 from provjera.jezgra.pravila import REGISTAR, PostavkeBaza
 from provjera.jezgra.formula import ParametriFormule, kanonski_json
 from provjera.jezgra.model.uloge import NaziviUloga
+from provjera.jezgra.poruke import poruka
 from provjera.jezgra.tipovi import Duljina
 
 
@@ -136,24 +137,35 @@ def objavljeni(sadrzaji: Iterable[bytes]) -> tuple[list[Profil], int]:
     return profili, neispravnih
 
 
-def svi(sadrzaji: Iterable[bytes]) -> tuple[list[Profil], int]:
-    """Kao ``objavljeni``, ali uključuje i neobjavljene profile (nastavnička aplikacija).
+def ucitaj_sve(
+    imenovani_sadrzaji: Iterable[tuple[str, bytes]],
+) -> list[tuple[str, Profil | GreskaProfila]]:
+    """Za svaku imenovanu datoteku vraća profil ili ``GreskaProfila`` (nastavnička aplikacija).
 
-    Profil s već viđenim ``vjezba.id`` broji se kao neispravan.
+    Kod dupliciranog ``vjezba.id`` ostaje jedini objavljeni profil; ako objavljenih nije
+    točno jedan, ostaje prvi po redu. Ostali se vraćaju kao greška ključa ``vjezba.id``.
     """
-    profili, neispravnih, ids = [], 0, set()
-    for sadrzaj in sadrzaji:
+    rezultat: list[tuple[str, Profil | GreskaProfila]] = []
+    po_id: dict[str, list[tuple[str, Profil]]] = {}
+    for ime, sadrzaj in imenovani_sadrzaji:
         try:
             profil = ucitaj(sadrzaj)
-        except GreskaProfila:
-            neispravnih += 1
+        except GreskaProfila as greska:
+            rezultat.append((ime, greska))
             continue
-        if profil.vjezba.id in ids:
-            neispravnih += 1
-            continue
-        ids.add(profil.vjezba.id)
-        profili.append(profil)
-    return profili, neispravnih
+        po_id.setdefault(profil.vjezba.id, []).append((ime, profil))
+        rezultat.append((ime, profil))
+    pobjednici = {}
+    for id_vjezbe, kandidati in po_id.items():
+        objavljeni_kandidati = [k for k in kandidati if k[1].vjezba.objavljeno]
+        pobjednici[id_vjezbe] = (
+            objavljeni_kandidati[0][0] if len(objavljeni_kandidati) == 1 else kandidati[0][0]
+        )
+    for i, (ime, ucitano) in enumerate(rezultat):
+        if isinstance(ucitano, Profil) and pobjednici[ucitano.vjezba.id] != ime:
+            greska = poruka("profil.dupli_id", datoteka=pobjednici[ucitano.vjezba.id])
+            rezultat[i] = (ime, GreskaProfila((greska,)))
+    return rezultat
 
 
 def verzija(profil: Profil) -> str:

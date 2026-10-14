@@ -4,7 +4,8 @@ Ključevi pravila imaju oblik ``<pravilo_id>.<slucaj>`` (npr. ``R-NAZIV.prolazi`
 a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefiksu:
 ``app.``, ``nastavnik.``, ``popis.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
 ``margine.``, ``naziv.``, ``ulaz.``, ``opce.``, ``status.``, ``izvjestaj.``,
-``lokacija.``, ``izvor.``, ``sazetak.``, ``poravnanje.``, ``prored.`` i ``vrijednost.``.
+``lokacija.``, ``izvor.``, ``sazetak.``, ``poravnanje.``, ``prored.``, ``spremnost.``
+i ``vrijednost.``.
 """
 
 from collections.abc import Mapping
@@ -62,9 +63,11 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "nastavnik.mapa_odabrana": "Podaci se spremaju u: {mapa}",
         "nastavnik.vjezba": "Vježba",
         "nastavnik.vjezba_neobjavljena": "{naziv} (neobjavljena)",
-        "nastavnik.nema_profila": "Nema ispravnih profila vježbi u mapi profili/.",
-        "nastavnik.neispravni_profili": (
-            "Neispravnih profila koji se ne nude za odabir: {broj}."
+        "nastavnik.nema_profila": "Nema profila vježbi u mapi profili/.",
+        "nastavnik.profil_neispravan": "{datoteka} (neispravan profil)",
+        "nastavnik.profil_greske": (
+            "Profil {datoteka} je neispravan i ne može se koristiti. "
+            "Ispravi ove greške (broj grešaka: {broj}):"
         ),
         "nastavnik.popis_naslov": "Popis studenata iz ISVU-a",
         "nastavnik.ucitaj_popis": "ISVU izvoz popisa studenata (.xlsx)",
@@ -158,6 +161,28 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Promjene su primijenjene – novi studenti: {novi}, ispisani: {ispisani}, "
             "ponovno upisani: {ponovno}."
         ),
+        "spremnost.naslov": "Spremnost",
+        "spremnost.profil": "Profil: {naziv} (verzija {verzija})",
+        "spremnost.aktivnih": "Aktivnih studenata: {broj}",
+        "spremnost.pravila": "Uključenih pravila: {broj} od {ukupno}",
+        "spremnost.margine_jedinstvene": "Margine su jedinstvene za sve Rbr. na popisu.",
+        "spremnost.margine_nejedinstvene": "Margine nisu jedinstvene za sve Rbr. na popisu.",
+        "spremnost.margine_neprovjerene": (
+            "Jedinstvenost margina nije provjerena jer nema zamrznutog popisa."
+        ),
+        "spremnost.spremno": "spremno",
+        "spremnost.nije_spremno": "nije spremno – problemi: {broj}",
+        "spremnost.nema_popisa": "Nema zamrznutog popisa studenata za ovu vježbu.",
+        "spremnost.nema_aktivnih": "Na zamrznutom popisu nema nijednog aktivnog studenta.",
+        "spremnost.rbr_izvan_raspona": (
+            "Rbr. {rbrovi} izvan je raspona formule margina "
+            "(najveći dopušteni Rbr. je {najveci})."
+        ),
+        "spremnost.dupli_rbr": "Rbr. {rbrovi} pojavljuje se na popisu više puta.",
+        "spremnost.iste_margine": "Rbr. {prvi} i Rbr. {drugi} imaju iste margine.",
+        "spremnost.nema_pravila": "U profilu nije uključeno nijedno pravilo.",
+        "profil.dupli_id": "vjezba.id: isti id već ima profil {datoteka}",
+        "profil.necitljiv": "datoteka: nije čitljiva ({razlog})",
         "profil.nedostupno": (
             "Provjera trenutno nije dostupna. Pokušaj kasnije ili se javi nastavniku."
         ),

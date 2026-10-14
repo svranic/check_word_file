@@ -1,0 +1,105 @@
+"""Pregled spremnosti vježbe (priča 3.3): profil i zamrznuti popis prije objave.
+
+Čista funkcija bez I/O-a: aplikacija predaje Rbr. sa zamrznutog popisa i broj aktivnih
+studenata, a problemi su ključevi poruka s parametrima (prijevod radi ``poruke``).
+"""
+
+from collections import Counter
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from types import MappingProxyType
+
+from provjera.jezgra import formula
+from provjera.jezgra import profil as profil_modul
+from provjera.jezgra.profil import Profil
+
+
+@dataclass(frozen=True)
+class Problem:
+    """Razlog zašto vježba nije spremna: ključ poruke ``spremnost.*`` i parametri."""
+
+    kljuc: str
+    parametri: Mapping[str, str | int] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "parametri", MappingProxyType(dict(self.parametri)))
+
+    def __eq__(self, drugi: object) -> bool:
+        if not isinstance(drugi, Problem):
+            return NotImplemented
+        return (self.kljuc, dict(self.parametri)) == (drugi.kljuc, dict(drugi.parametri))
+
+    def __hash__(self) -> int:
+        return hash((self.kljuc, tuple(sorted(self.parametri.items()))))
+
+
+@dataclass(frozen=True)
+class PregledSpremnosti:
+    naziv: str
+    verzija: str
+    broj_aktivnih: int
+    broj_ukljucenih_pravila: int
+    margine_jedinstvene: bool | None  # None: nema zamrznutog popisa
+    problemi: tuple[Problem, ...]
+
+    @property
+    def spremno(self) -> bool:
+        return not self.problemi
+
+
+def _popis_rbrova(rbrovi: Sequence[int]) -> str:
+    return ", ".join(str(r) for r in rbrovi)
+
+
+def pregled(
+    profil: Profil, rbrovi: Sequence[int] | None, broj_aktivnih: int
+) -> PregledSpremnosti:
+    """Računa spremnost; ``rbrovi`` je ``None`` kad zamrznutog popisa nema.
+
+    Jedinstvenost margina provjerava se za sve Rbr. na popisu (i neaktivne);
+    Rbr. izvan raspona formule preskaču se jer su već prijavljeni kao problem.
+    """
+    problemi: list[Problem] = []
+    margine_jedinstvene: bool | None = None
+    if rbrovi is None:
+        problemi.append(Problem("spremnost.nema_popisa"))
+    else:
+        if broj_aktivnih <= 0:
+            problemi.append(Problem("spremnost.nema_aktivnih"))
+        najveci = formula.najveci_rbr(profil.formula)
+        jedinstveni = sorted(set(rbrovi))
+        dupli = sorted(r for r, broj in Counter(rbrovi).items() if broj > 1)
+        if dupli:
+            problemi.append(Problem("spremnost.dupli_rbr", {"rbrovi": _popis_rbrova(dupli)}))
+        izvan = [r for r in jedinstveni if not 1 <= r <= najveci]
+        if izvan:
+            problemi.append(
+                Problem(
+                    "spremnost.rbr_izvan_raspona",
+                    {"rbrovi": _popis_rbrova(izvan), "najveci": najveci},
+                )
+            )
+        vidjene: dict[formula.Margine, int] = {}
+        margine_jedinstvene = True
+        for rbr in jedinstveni:
+            if not 1 <= rbr <= najveci:
+                continue
+            margine = formula.margine(rbr, profil.formula)
+            if margine in vidjene:
+                margine_jedinstvene = False
+                problemi.append(
+                    Problem("spremnost.iste_margine", {"prvi": vidjene[margine], "drugi": rbr})
+                )
+            else:
+                vidjene[margine] = rbr
+    ukljucenih = sum(p.ukljuceno for p in profil.pravila.values())
+    if not ukljucenih:
+        problemi.append(Problem("spremnost.nema_pravila"))
+    return PregledSpremnosti(
+        naziv=profil.vjezba.naziv,
+        verzija=profil_modul.verzija(profil),
+        broj_aktivnih=broj_aktivnih,
+        broj_ukljucenih_pravila=ukljucenih,
+        margine_jedinstvene=margine_jedinstvene,
+        problemi=tuple(problemi),
+    )

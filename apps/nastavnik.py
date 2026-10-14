@@ -22,7 +22,7 @@ from provjera.adapteri.popis import (
     usporedi,
     zamrzni,
 )
-from provjera.jezgra import profil
+from provjera.jezgra import profil, spremnost
 from provjera.jezgra.poruke import poruka
 
 KORIJEN = Path(__file__).resolve().parents[1]
@@ -66,27 +66,56 @@ def podatkovna_mapa() -> Path:
     return mapa
 
 
+def _procitaj_profile() -> list[tuple[str, profil.Profil | profil.GreskaProfila]]:
+    imenovani, necitljivi = [], []
+    for datoteka in sorted(MAPA_PROFILA.glob("*.toml")):
+        try:
+            imenovani.append((datoteka.name, datoteka.read_bytes()))
+        except OSError as greska:
+            razlog = greska.strerror or type(greska).__name__
+            necitljivi.append(
+                (
+                    datoteka.name,
+                    profil.GreskaProfila((poruka("profil.necitljiv", razlog=razlog),)),
+                )
+            )
+    return profil.ucitaj_sve(imenovani) + necitljivi
+
+
 def odabir_vjezbe() -> profil.Profil:
-    profili, neispravnih = profil.svi(
-        datoteka.read_bytes() for datoteka in sorted(MAPA_PROFILA.glob("*.toml"))
-    )
-    if neispravnih:
-        st.warning(poruka("nastavnik.neispravni_profili", broj=neispravnih), icon="⚠️")
-    if not profili:
+    """Nudi sve profile; neispravan se prikazuje sa svim greškama i zaustavlja stranicu."""
+    ucitani = _procitaj_profile()
+    if not ucitani:
         st.error(poruka("nastavnik.nema_profila"))
         st.stop()
-    po_id = {p.vjezba.id: p for p in profili}
+    # Ispravni prvi, da zadani odabir bude upotrebljiv.
+    ucitani.sort(key=lambda par: isinstance(par[1], profil.GreskaProfila))
+    po_datoteci = dict(ucitani)
 
-    def naziv(id_vjezbe: str) -> str:
-        p = po_id[id_vjezbe]
+    def naziv(ime: str) -> str:
+        p = po_datoteci[ime]
+        if isinstance(p, profil.GreskaProfila):
+            return poruka("nastavnik.profil_neispravan", datoteka=ime)
         if p.vjezba.objavljeno:
             return p.vjezba.naziv
         return poruka("nastavnik.vjezba_neobjavljena", naziv=p.vjezba.naziv)
 
-    id_vjezbe = st.selectbox(
-        poruka("nastavnik.vjezba"), list(po_id), format_func=naziv, key="vjezba"
+    ime = st.selectbox(
+        poruka("nastavnik.vjezba"), list(po_datoteci), format_func=naziv, key="vjezba"
     )
-    return po_id[id_vjezbe]
+    odabrani = po_datoteci[ime]
+    if isinstance(odabrani, profil.GreskaProfila):
+        st.error(
+            poruka(
+                "nastavnik.profil_greske",
+                datoteka=bez_markdowna(ime),
+                broj=len(odabrani.greske),
+            ),
+            icon="❌",
+        )
+        st.markdown("\n".join(f"- {bez_markdowna(g)}" for g in odabrani.greske))
+        st.stop()
+    return odabrani
 
 
 def opis_greske(greska: GreskaRetka) -> str:
@@ -314,6 +343,48 @@ def akcije_popisa(
     )
 
 
+def prikazi_spremnost(
+    odabrani: profil.Profil, zamrznuti: tuple[Student, ...] | None
+) -> spremnost.PregledSpremnosti:
+    st.subheader(poruka("spremnost.naslov"))
+    rbrovi = None if zamrznuti is None else [s.rbr for s in zamrznuti]
+    aktivnih = 0 if zamrznuti is None else sum(s.aktivan for s in zamrznuti)
+    rezultat = spremnost.pregled(odabrani, rbrovi, aktivnih)
+    if rezultat.margine_jedinstvene is None:
+        margine = poruka("spremnost.margine_neprovjerene")
+    elif rezultat.margine_jedinstvene:
+        margine = "✅ " + poruka("spremnost.margine_jedinstvene")
+    else:
+        margine = "❌ " + poruka("spremnost.margine_nejedinstvene")
+    st.markdown(
+        "\n".join(
+            f"- {redak}"
+            for redak in (
+                poruka(
+                    "spremnost.profil",
+                    naziv=bez_markdowna(rezultat.naziv),
+                    verzija=rezultat.verzija,
+                ),
+                poruka("spremnost.aktivnih", broj=rezultat.broj_aktivnih),
+                poruka(
+                    "spremnost.pravila",
+                    broj=rezultat.broj_ukljucenih_pravila,
+                    ukupno=len(odabrani.pravila),
+                ),
+                margine,
+            )
+        )
+    )
+    if rezultat.spremno:
+        st.success(poruka("spremnost.spremno"), icon="✅")
+    else:
+        st.warning(poruka("spremnost.nije_spremno", broj=len(rezultat.problemi)), icon="❌")
+        st.markdown(
+            "\n".join(f"- {poruka(p.kljuc, **p.parametri)}" for p in rezultat.problemi)
+        )
+    return rezultat
+
+
 st.set_page_config(page_title=poruka("nastavnik.naslov"), page_icon="📋")
 
 st.title(poruka("nastavnik.naslov"))
@@ -322,6 +393,7 @@ mapa = podatkovna_mapa()
 vjezba = odabir_vjezbe()
 mapa_vjezbe = mapa / vjezba.vjezba.id
 zamrznuti = zamrznuti_popis(putanja_popisa(mapa_vjezbe))
+prikazi_spremnost(vjezba, zamrznuti)
 
 st.subheader(poruka("nastavnik.popis_naslov"))
 datoteka = st.file_uploader(poruka("nastavnik.ucitaj_popis"), type=["xlsx"], key="isvu")
