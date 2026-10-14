@@ -304,6 +304,98 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Promijeni ga u stilu: Početna (Home) → Stilovi (Styles) → {stil} → Izmijeni "
             "(Modify) → Oblikovanje (Format) → Odlomak (Paragraph) → Iza (After)."
         ),
+        "pravilo.R-SAZETAK": "Sažetak",
+        "R-SAZETAK.prolazi": "Sažetak je ispravno oblikovan.",
+        "R-SAZETAK.nema_sazetka": (
+            "U radu nije pronađen sažetak. Ispred prvog poglavlja upiši naslov „{naziv}“ "
+            "i ispod njega tekst sažetka."
+        ),
+        "R-SAZETAK.nema_naslova": (
+            "Ispred prvog poglavlja postoji tekst, ali nema naslova „{naziv}“. "
+            "Upiši naslov „{naziv}“ iznad teksta sažetka."
+        ),
+        "R-SAZETAK.prazan_sazetak": (
+            "Ispod naslova „{naziv}“ nema teksta sažetka. Upiši tekst sažetka između naslova "
+            "„{naziv}“ i prvog poglavlja."
+        ),
+        "R-SAZETAK.krivo_mjesto": (
+            "Sažetak mora biti ispred prvog poglavlja. Premjesti naslov „{naziv}“ i tekst "
+            "sažetka iza naslovnice, a ispred naslova prvog poglavlja."
+        ),
+        "R-SAZETAK.font": (
+            "Font sažetka je {pronadeno}, a treba biti {ocekivano}. Sažetak smije imati "
+            "vlastiti stil (npr. „Sažetak“) ili biti u stilu Normal: označi tekst sažetka i "
+            "odaberi Početna (Home) → Font → {ocekivano}, ili font promijeni u stilu sažetka: "
+            "Početna (Home) → Stilovi (Styles) → desni klik na stil → Izmijeni (Modify) → "
+            "Oblikovanje (Formatting) → {ocekivano}."
+        ),
+        "R-SAZETAK.font_tema": (
+            "Font sažetka je {pronadeno}, a treba biti {ocekivano}. Stil sažetka ne navodi "
+            "font pa Word uzima font teme dokumenta (u novijim verzijama Aptos). Odaberi "
+            "Dizajn (Design) → Fontovi (Fonts) i skup u kojem je font tijela {ocekivano}, "
+            "ili zadaj font u stilu sažetka: Početna (Home) → Stilovi (Styles) → desni klik "
+            "na stil → Izmijeni (Modify) → Oblikovanje (Formatting) → {ocekivano}."
+        ),
+        "R-SAZETAK.font_nepoznat": (
+            "Font sažetka trebao bi doći iz teme dokumenta, ali tema nije zapisana u datoteci "
+            "pa font nije moguće odrediti. Zadaj font izravno u stilu sažetka: Početna (Home) "
+            "→ Stilovi (Styles) → desni klik na stil → Izmijeni (Modify) → Oblikovanje "
+            "(Formatting) → {ocekivano}."
+        ),
+        "R-SAZETAK.velicina": (
+            "Veličina fonta sažetka je {pronadeno}, a treba biti {ocekivano}. Označi tekst "
+            "sažetka i odaberi Početna (Home) → Veličina fonta (Font Size) → {ocekivano}, ili "
+            "veličinu promijeni u vlastitom stilu sažetka."
+        ),
+        "R-SAZETAK.poravnanje": (
+            "Poravnanje sažetka je {pronadeno}, a treba biti {ocekivano}. Stavi kursor u "
+            "sažetak i odaberi Početna (Home) → Odlomak (Paragraph) → Poravnanje (Alignment) "
+            "→ {ocekivano}."
+        ),
+        "R-SAZETAK.uvlaka_lijevo": (
+            "Lijeva uvlaka sažetka je {pronadeno}, a treba biti {ocekivano}. Sažetak smije "
+            "imati vlastitu uvlaku (ili vlastiti stil), za razliku od osnovnog teksta. Označi "
+            "sažetak i odaberi Početna (Home) → Odlomak (Paragraph) → Uvlaka (Indentation) → "
+            "Lijevo (Left): {ocekivano}."
+        ),
+        "R-SAZETAK.uvlaka_desno": (
+            "Desna uvlaka sažetka je {pronadeno}, a treba biti {ocekivano}. Sažetak smije "
+            "imati vlastitu uvlaku (ili vlastiti stil), za razliku od osnovnog teksta. Označi "
+            "sažetak i odaberi Početna (Home) → Odlomak (Paragraph) → Uvlaka (Indentation) → "
+            "Desno (Right): {ocekivano}."
+        ),
+        "pravilo.R-LITERATURA": "Literatura",
+        "R-LITERATURA.prolazi": "Stavke literature su ispravno oblikovane.",
+        "R-LITERATURA.nema_stavki": (
+            "U radu nije pronađen popis literature: stavke se pišu ispod naslova „{naziv}“, "
+            "koji je posljednje poglavlje rada. Upiši korištene izvore ispod tog naslova, "
+            "svaki u svom odlomku."
+        ),
+        "R-LITERATURA.font": (
+            "Font stavke literature je {pronadeno}, a treba biti {ocekivano}. Literatura smije "
+            "imati vlastiti stil (npr. Odlomak popisa (List Paragraph)): označi stavke i "
+            "odaberi Početna (Home) → Font → {ocekivano}, ili font promijeni u stilu stavki: "
+            "Početna (Home) → Stilovi (Styles) → desni klik na stil → Izmijeni (Modify) → "
+            "Oblikovanje (Formatting) → {ocekivano}."
+        ),
+        "R-LITERATURA.font_tema": (
+            "Font stavke literature je {pronadeno}, a treba biti {ocekivano}. Stil stavke ne "
+            "navodi font pa Word uzima font teme dokumenta (u novijim verzijama Aptos). Odaberi "
+            "Dizajn (Design) → Fontovi (Fonts) i skup u kojem je font tijela {ocekivano}, ili "
+            "zadaj font u stilu stavki: Početna (Home) → Stilovi (Styles) → desni klik na stil "
+            "→ Izmijeni (Modify) → Oblikovanje (Formatting) → {ocekivano}."
+        ),
+        "R-LITERATURA.font_nepoznat": (
+            "Font stavke literature trebao bi doći iz teme dokumenta, ali tema nije zapisana u "
+            "datoteci pa font nije moguće odrediti. Zadaj font izravno u stilu stavki: Početna "
+            "(Home) → Stilovi (Styles) → desni klik na stil → Izmijeni (Modify) → Oblikovanje "
+            "(Formatting) → {ocekivano}."
+        ),
+        "R-LITERATURA.velicina": (
+            "Veličina fonta stavke literature je {pronadeno}, a treba biti {ocekivano}. Označi "
+            "stavke i odaberi Početna (Home) → Veličina fonta (Font Size) → {ocekivano}, ili "
+            "veličinu promijeni u stilu stavki."
+        ),
         "poravnanje.lijevo": "lijevo (Align Left)",
         "poravnanje.sredina": "centrirano (Center)",
         "poravnanje.desno": "desno (Align Right)",

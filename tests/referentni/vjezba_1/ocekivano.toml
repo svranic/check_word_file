@@ -72,3 +72,18 @@ padaju = ["R-NASLOVI"]
 
 [primjeri.naslovi_sazetak_numeriran]
 padaju = ["R-NASLOVI"]
+
+[primjeri.sazetak_bez_uvlake]
+padaju = ["R-SAZETAK"]
+
+[primjeri.sazetak_jedna_strana]
+padaju = ["R-SAZETAK"]
+
+[primjeri.sazetak_vlastiti_stil]
+padaju = []
+
+[primjeri.sazetak_nedostaje]
+padaju = ["R-SAZETAK"]
+
+[primjeri.literatura_font]
+padaju = ["R-LITERATURA"]

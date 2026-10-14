@@ -24,9 +24,9 @@ from provjera.jezgra.nalaz import (
     Nalaz,
     Status,
     Vrijednost,
-    VrstaIzvora,
 )
 from provjera.jezgra.pravila.osnova import PostavkeBaza, registriraj
+from provjera.jezgra.pravila.runovi import nalazi_runova
 from provjera.jezgra.tipovi import Duljina, VelicinaFonta
 
 if TYPE_CHECKING:
@@ -129,34 +129,7 @@ def _oblik(o: Odlomak, p: Postavke) -> list[Nalaz]:
         if not unutar_tolerancije(efektivno.vrijednost, ocekivano, _TOLERANCIJA):
             nalazi.append(_nalaz(o, p.stil, kljuc, Vrijednost(ocekivano, Jedinica.TOCKE),
                                  Vrijednost(efektivno.vrijednost, Jedinica.TOCKE), efektivno))
-    return nalazi + _runovi(o, p)
-
-
-def _runovi(o: Odlomak, p: Postavke) -> list[Nalaz]:
-    """Najviše jedan nalaz po vrsti odstupanja u odlomku, da pojave broje odlomke."""
-    nalazi: dict[tuple, Nalaz] = {}
-
-    def dodaj(nalaz: Nalaz) -> None:
-        nalazi.setdefault((nalaz.poruka_kljuc, nalaz.pronadeno, nalaz.izvor), nalaz)
-
-    for run in o.runovi:
-        if not run.tekst.strip():
-            continue
-        font = run.font
-        if font.vrijednost is None:
-            dodaj(_nalaz(o, p.stil, "font_nepoznat", Vrijednost(p.font, Jedinica.TEKST), None, font,
-                         Status.NEPROVJERLJIVO))
-        elif font.vrijednost.casefold() != p.font.casefold():
-            kljuc = "font_tema" if font.izvor.vrsta is VrstaIzvora.TEMA else "font"
-            dodaj(_nalaz(o, p.stil, kljuc, Vrijednost(p.font, Jedinica.TEKST),
-                         Vrijednost(font.vrijednost, Jedinica.TEKST), font))
-        if run.podebljano.vrijednost is not p.podebljano:
-            dodaj(_nalaz(o, p.stil, "podebljano", Vrijednost(p.podebljano, Jedinica.BOOL),
-                         Vrijednost(run.podebljano.vrijednost, Jedinica.BOOL), run.podebljano))
-        if not unutar_tolerancije(run.velicina.vrijednost, p.velicina, _TOLERANCIJA):
-            dodaj(_nalaz(o, p.stil, "velicina", Vrijednost(p.velicina, Jedinica.POLUTOCKE),
-                         Vrijednost(run.velicina.vrijednost, Jedinica.POLUTOCKE), run.velicina))
-    return list(nalazi.values())
+    return nalazi + nalazi_runova(o, ID, p.font, p.velicina, {"stil": p.stil}, podebljano=p.podebljano)
 
 
 def _u_stilu(o: Odlomak, p: Postavke) -> bool:

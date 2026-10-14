@@ -139,9 +139,15 @@ def _heading1(dokument, profil: Profil) -> None:
 
 
 def _sadrzaj(dokument, profil: Profil) -> None:
-    """Sažetak, poglavlja u stilu Heading 1 s osnovnim tekstom i stavka literature."""
+    """Sažetak, poglavlja u stilu Heading 1 s osnovnim tekstom i stavka literature.
+
+    Sažetak je u stilu Normal s izravnom uvlakom po [pravila.R-SAZETAK].
+    """
+    sazetak = profil.pravila["R-SAZETAK"]
     dokument.add_paragraph(profil.uloge.sazetak)
-    dokument.add_paragraph("Rad ukratko opisuje izbor studija i ciljeve studiranja.")
+    tekst = dokument.add_paragraph("Rad ukratko opisuje izbor studija i ciljeve studiranja.")
+    tekst.paragraph_format.left_indent = Twips(sazetak.uvlaka_lijevo)
+    tekst.paragraph_format.right_indent = Twips(sazetak.uvlaka_desno)
     for poglavlje in profil.uloge.poglavlja:
         dokument.add_heading(poglavlje, level=1)
         if poglavlje == profil.uloge.literatura:
@@ -221,16 +227,43 @@ def _zrcalne(dokument, rbr, profil):
     dokument.settings.element.append(OxmlElement("w:mirrorMargins"))
 
 
+def _tekst_sazetka(dokument, profil):
+    """Odlomak teksta sažetka (iza naslova „Sažetak“)."""
+    odlomci = dokument.paragraphs
+    naslov = next(i for i, o in enumerate(odlomci) if o.text == profil.uloge.sazetak)
+    return odlomci[naslov + 1]
+
+
+def _zastiti_sazetak_i_literaturu(dokument, profil) -> None:
+    """Varijanta koja kvari stil Normal smije pasti samo na R-TEKST.
+
+    Sažetak (u Normal) i literatura (List Paragraph, nasljeđuje Normal) dobivaju ispravne
+    vrijednosti izravno: smiju imati vlastito oblikovanje.
+    """
+    sazetak, literatura = profil.pravila["R-SAZETAK"], profil.pravila["R-LITERATURA"]
+    odlomak = _tekst_sazetka(dokument, profil)
+    odlomak.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    for run in odlomak.runs:
+        run.font.name = sazetak.font
+        run.font.size = Pt(sazetak.velicina / 2)
+    stil = dokument.styles["List Paragraph"]
+    stil.font.name = literatura.font
+    stil.font.size = Pt(literatura.velicina / 2)
+
+
 def _tekst_font(dokument, rbr, profil):
     dokument.styles["Normal"].font.name = "Times New Roman"
+    _zastiti_sazetak_i_literaturu(dokument, profil)
 
 
 def _tekst_velicina(dokument, rbr, profil):
     dokument.styles["Normal"].font.size = Pt(11)
+    _zastiti_sazetak_i_literaturu(dokument, profil)
 
 
 def _tekst_poravnanje(dokument, rbr, profil):
     dokument.styles["Normal"].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    _zastiti_sazetak_i_literaturu(dokument, profil)
 
 
 def _tekst_razmak(dokument, rbr, profil):
@@ -266,6 +299,7 @@ def _tekst_aptos(rbr: int, profil: Profil) -> bytes:
     """Normal bez fonta: Word uzima font teme (Aptos u novijim verzijama)."""
     dokument = _dokument(rbr, profil)
     dokument.styles["Normal"].font.name = None
+    _zastiti_sazetak_i_literaturu(dokument, profil)
     return zamijeni_u_zipu(_spremi(dokument), {"word/theme/theme1.xml": tema_s_fontom("Aptos")})
 
 
@@ -315,6 +349,42 @@ def _naslovi_sazetak_numeriran(dokument, rbr, profil):
     sazetak.style = dokument.styles["Heading 1"]
 
 
+def _sazetak_bez_uvlake(dokument, rbr, profil):
+    oblik = _tekst_sazetka(dokument, profil).paragraph_format
+    oblik.left_indent = oblik.right_indent = None
+
+
+def _sazetak_jedna_strana(dokument, rbr, profil):
+    _tekst_sazetka(dokument, profil).paragraph_format.right_indent = None
+
+
+def _sazetak_vlastiti_stil(dokument, rbr, profil):
+    """Stil „Sažetak“ sa svim svojstvima; odlomak nema izravnu uvlaku."""
+    sazetak = profil.pravila["R-SAZETAK"]
+    stil = dokument.styles.add_style("Sažetak", WD_STYLE_TYPE.PARAGRAPH)
+    stil.base_style = dokument.styles["Normal"]
+    stil.font.name = sazetak.font
+    stil.font.size = Pt(sazetak.velicina / 2)
+    oblik = stil.paragraph_format
+    oblik.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    oblik.left_indent = Twips(sazetak.uvlaka_lijevo)
+    oblik.right_indent = Twips(sazetak.uvlaka_desno)
+    odlomak = _tekst_sazetka(dokument, profil)
+    odlomak.style = stil
+    odlomak.paragraph_format.left_indent = odlomak.paragraph_format.right_indent = None
+
+
+def _sazetak_nedostaje(dokument, rbr, profil):
+    tekst = _tekst_sazetka(dokument, profil)
+    naslov = next(o for o in dokument.paragraphs if o.text == profil.uloge.sazetak)
+    for odlomak in (naslov, tekst):
+        odlomak._p.getparent().remove(odlomak._p)
+
+
+def _literatura_font(dokument, rbr, profil):
+    dokument.styles["List Paragraph"].font.name = "Times New Roman"
+
+
 VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "ispravan": ispravan,
     "jedna_sekcija": lambda rbr, profil: _spremi(_dokument(rbr, profil, jedna_sekcija=True)),
@@ -339,6 +409,11 @@ VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "naslovi_nedostaje": _izmijeni(_naslovi_nedostaje),
     "naslovi_font": _izmijeni(_naslovi_font),
     "naslovi_sazetak_numeriran": _izmijeni(_naslovi_sazetak_numeriran),
+    "sazetak_bez_uvlake": _izmijeni(_sazetak_bez_uvlake),
+    "sazetak_jedna_strana": _izmijeni(_sazetak_jedna_strana),
+    "sazetak_vlastiti_stil": _izmijeni(_sazetak_vlastiti_stil),
+    "sazetak_nedostaje": _izmijeni(_sazetak_nedostaje),
+    "literatura_font": _izmijeni(_literatura_font),
 }
 
 

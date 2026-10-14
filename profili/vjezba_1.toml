@@ -74,3 +74,22 @@ razmak_ispred = "6 pt"
 razmak_iza = "6 pt"
 # Wordova numeracija naslova; {n} je redni broj naslova u stilu iz profila, redom u dokumentu.
 oznaka = "{n}."
+
+[pravila.R-SAZETAK]
+ukljuceno = true
+# Odlomci sažetka (između naslova „Sažetak“ i prvog poglavlja); smiju imati vlastiti stil,
+# provjeravaju se efektivne vrijednosti.
+font = "Calibri"
+velicina = "12 pt"
+# lijevo | sredina | desno | obostrano
+poravnanje = "obostrano"
+uvlaka_lijevo = "3,5 cm"
+uvlaka_desno = "3,5 cm"
+# Dopušteno odstupanje uvlaka: Word 3,5 cm zapisuje kao 1984 ili 1985 twipsa.
+tolerancija = "0,03 cm"
+
+[pravila.R-LITERATURA]
+ukljuceno = true
+# Stavke literature (odlomci ispod naslova „Literatura“); vlastiti stil je dopušten.
+font = "Calibri"
+velicina = "12 pt"

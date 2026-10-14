@@ -37,6 +37,10 @@ def test_verzija_ne_ovisi_o_redoslijedu_ni_komentarima():
         "[pravila.R-NASLOVI]\noznaka = \"{n}.\"\nrazmak_iza = \"6 pt\"\nrazmak_ispred = \"6 pt\"\n"
         "poravnanje = \"lijevo\"\nvelicina = \"12 pt\"\npodebljano = true\nfont = \"Calibri\"\n"
         "stil = \"Heading 1\"\n"
+        "[pravila.R-LITERATURA]\nvelicina = \"12 pt\"\nfont = \"Calibri\"\nukljuceno = true\n"
+        "[pravila.R-SAZETAK]\ntolerancija = \"0,03 cm\"\nuvlaka_desno = \"3,5 cm\"\n"
+        "uvlaka_lijevo = \"3,5 cm\"\nporavnanje = \"obostrano\"\nvelicina = \"12 pt\"\n"
+        "font = \"Calibri\"\nukljuceno = true\n"
         "[uloge]\npoglavlja = [\"Uvod\", \"Studij geodezije i geomatike u Varaždinu\", "
         "\"Zaključak\", \"Literatura\"]\nliteratura = \"Literatura\"\nsazetak = \"Sažetak\"\n"
     )

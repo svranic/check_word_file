@@ -19,9 +19,9 @@ from provjera.jezgra.nalaz import (
     Nalaz,
     Status,
     Vrijednost,
-    VrstaIzvora,
 )
 from provjera.jezgra.pravila.osnova import PostavkeBaza, registriraj
+from provjera.jezgra.pravila.runovi import nalazi_runova
 from provjera.jezgra.tipovi import Duljina, Retci, VelicinaFonta
 
 if TYPE_CHECKING:
@@ -102,33 +102,8 @@ def _odlomak(o: Odlomak, p: Postavke) -> list[Nalaz]:
     elif not unutar_tolerancije(prored.iznos, p.prored, _TOLERANCIJA):
         nalazi.append(_nalaz(o, p.stil, "prored", Vrijednost(p.prored, Jedinica.RETCI),
                              Vrijednost(prored.iznos, Jedinica.RETCI), o.prored))
-    nalazi += _runovi(o, p)
+    nalazi += nalazi_runova(o, ID, p.font, p.velicina, {"stil": p.stil})
     return nalazi
-
-
-def _runovi(o: Odlomak, p: Postavke) -> list[Nalaz]:
-    """Najviše jedan nalaz po vrsti odstupanja u odlomku, da pojave broje odlomke."""
-    nalazi: dict[tuple, Nalaz] = {}
-    for run in o.runovi:
-        if not run.tekst.strip():
-            continue
-        font = run.font
-        if font.vrijednost is None:
-            nalaz = _nalaz(o, p.stil, "font_nepoznat", Vrijednost(p.font, Jedinica.TEKST), None, font,
-                           Status.NEPROVJERLJIVO)
-        elif font.vrijednost.casefold() != p.font.casefold():
-            kljuc = "font_tema" if font.izvor.vrsta is VrstaIzvora.TEMA else "font"
-            nalaz = _nalaz(o, p.stil, kljuc, Vrijednost(p.font, Jedinica.TEKST),
-                           Vrijednost(font.vrijednost, Jedinica.TEKST), font)
-        else:
-            nalaz = None
-        if nalaz is not None:
-            nalazi.setdefault((nalaz.poruka_kljuc, nalaz.pronadeno, nalaz.izvor), nalaz)
-        if not unutar_tolerancije(run.velicina.vrijednost, p.velicina, _TOLERANCIJA):
-            nalaz = _nalaz(o, p.stil, "velicina", Vrijednost(p.velicina, Jedinica.POLUTOCKE),
-                           Vrijednost(run.velicina.vrijednost, Jedinica.POLUTOCKE), run.velicina)
-            nalazi.setdefault((nalaz.poruka_kljuc, nalaz.pronadeno, nalaz.izvor), nalaz)
-    return list(nalazi.values())
 
 
 @registriraj(
