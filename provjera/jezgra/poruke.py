@@ -4,8 +4,8 @@ Ključevi pravila imaju oblik ``<pravilo_id>.<slucaj>`` (npr. ``R-NAZIV.prolazi`
 a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefiksu:
 ``app.``, ``nastavnik.``, ``popis.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
 ``margine.``, ``naziv.``, ``ulaz.``, ``opce.``, ``status.``, ``izvjestaj.``,
-``lokacija.``, ``izvor.``, ``sazetak.``, ``poravnanje.``, ``prored.``, ``spremnost.``
-i ``vrijednost.``.
+``lokacija.``, ``izvor.``, ``sazetak.``, ``poravnanje.``, ``prored.``, ``spremnost.``,
+``samoprovjera.`` i ``vrijednost.``.
 """
 
 from collections.abc import Mapping
@@ -181,6 +181,46 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "spremnost.dupli_rbr": "Rbr. {rbrovi} pojavljuje se na popisu više puta.",
         "spremnost.iste_margine": "Rbr. {prvi} i Rbr. {drugi} imaju iste margine.",
         "spremnost.nema_pravila": "U profilu nije uključeno nijedno pravilo.",
+        "spremnost.samoprovjera_nije_pokrenuta": (
+            "Samoprovjera profila na referentnom skupu nije pokrenuta."
+        ),
+        "spremnost.samoprovjera_nema_skupa": "Samoprovjera nije moguća: {poruka}",
+        "spremnost.samoprovjera_ne_prolazi": (
+            "Samoprovjera profila ne prolazi (odstupanja: {broj})."
+        ),
+        "samoprovjera.naslov": "Samoprovjera",
+        "samoprovjera.opis": (
+            "Provjerava ispravan rad i sve pokvarene varijante iz referentnog skupa "
+            "trenutnim profilom. Promjena profila poništava rezultat."
+        ),
+        "samoprovjera.pokreni": "Pokreni samoprovjeru",
+        "samoprovjera.prolazi": "Samoprovjera prolazi.",
+        "samoprovjera.ne_prolazi": "Samoprovjera ne prolazi (odstupanja: {broj}).",
+        "samoprovjera.stupac_primjer": "Primjer",
+        "samoprovjera.stupac_ocekivano": "Očekivano",
+        "samoprovjera.stupac_pronadeno": "Pronađeno",
+        "samoprovjera.stupac_status": "Status",
+        "samoprovjera.status_prolazi": "✅ prolazi",
+        "samoprovjera.status_ne_prolazi": "❌ ne prolazi",
+        "samoprovjera.status_preskoceno": "⏭️ preskočeno (pravilo isključeno)",
+        "samoprovjera.status_razlog": "{status} – {razlog}",
+        "samoprovjera.nista": "—",
+        "samoprovjera.nijedno": "nijedno pravilo",
+        "samoprovjera.nema_skupa": "Za ovu vježbu nema referentnog skupa (mapa {mapa} ne postoji).",
+        "samoprovjera.nema_ocekivanog": "Referentni skup nema datoteku {putanja}.",
+        "samoprovjera.ocekivano_neispravno": (
+            "Datoteka {putanja} nije ispravna (potrebni su rbr, naziv i [primjeri.<ime>] padaju)."
+        ),
+        "samoprovjera.nema_datoteke": "primjer nema .docx datoteku",
+        "samoprovjera.nema_zapisa": "datoteka nema zapis u ocekivano.toml",
+        "samoprovjera.necitljiv": "datoteka nije čitljiva",
+        "samoprovjera.odbijeno": "provjera je odbila dokument ({razlog})",
+        "samoprovjera.greska_provjere": "neočekivana greška pri provjeri ({razlog})",
+        "samoprovjera.nepoznato_pravilo": (
+            "Datoteka {putanja} navodi nepoznata pravila: {pravila}."
+        ),
+        "samoprovjera.mapa_necitljiva": "Mapa referentnog skupa {mapa} nije čitljiva.",
+        "samoprovjera.u_tijeku": "Samoprovjera je u tijeku …",
         "profil.dupli_id": "vjezba.id: isti id već ima profil {datoteka}",
         "profil.necitljiv": "datoteka: nije čitljiva ({razlog})",
         "profil.nedostupno": (

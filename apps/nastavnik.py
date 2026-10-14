@@ -22,11 +22,21 @@ from provjera.adapteri.popis import (
     usporedi,
     zamrzni,
 )
+from provjera.adapteri.samoprovjera import GreskaReferentnog, otisak_skupa
+from provjera.adapteri.samoprovjera import pokreni as pokreni_samoprovjeru
 from provjera.jezgra import profil, spremnost
 from provjera.jezgra.poruke import poruka
+from provjera.jezgra.samoprovjera import (
+    NemaSkupa,
+    RezultatPrimjera,
+    StatusPrimjera,
+    broj_odstupanja,
+    ukupno,
+)
 
 KORIJEN = Path(__file__).resolve().parents[1]
 MAPA_PROFILA = KORIJEN / "profili"
+MAPA_REFERENTNOG = KORIJEN / "tests" / "referentni"
 ZADANA_MAPA = Path.home() / "ProvjeraWord"
 
 
@@ -343,13 +353,111 @@ def akcije_popisa(
     )
 
 
+# --- Samoprovjera (priča 3.4) -------------------------------------------------
+
+KLJUC_SAMOPROVJERE = "samoprovjera_rezultati"
+
+RezultatSamoprovjere = tuple[RezultatPrimjera, ...] | GreskaReferentnog
+
+
+def kljuc_samoprovjere(odabrani: profil.Profil) -> tuple[str, str]:
+    """Rezultat vrijedi samo za ovu verziju profila i ovaj sadržaj referentnog skupa."""
+    return (profil.verzija(odabrani), otisak_skupa(odabrani.vjezba.id, MAPA_REFERENTNOG))
+
+
+def _pokreni_samoprovjeru(odabrani: profil.Profil) -> None:
+    # Otisak prije pokretanja: promjena skupa tijekom izvođenja poništava rezultat.
+    kljuc = kljuc_samoprovjere(odabrani)
+    with st.spinner(poruka("samoprovjera.u_tijeku")):
+        try:
+            rezultat: RezultatSamoprovjere = pokreni_samoprovjeru(odabrani, MAPA_REFERENTNOG)
+        except GreskaReferentnog as greska:
+            rezultat = greska
+    # Po vježbi se čuva samo zadnji rezultat.
+    spremljeni = st.session_state.setdefault(KLJUC_SAMOPROVJERE, {})
+    spremljeni[odabrani.vjezba.id] = (kljuc, rezultat)
+
+
+def rezultat_samoprovjere(odabrani: profil.Profil) -> RezultatSamoprovjere | None:
+    """Zadnji rezultat ako se od tada nisu promijenili ni profil ni referentni skup."""
+    spremljeno = st.session_state.get(KLJUC_SAMOPROVJERE, {}).get(odabrani.vjezba.id)
+    if spremljeno is None or spremljeno[0] != kljuc_samoprovjere(odabrani):
+        return None
+    return spremljeno[1]
+
+
+def _skup(pravila: frozenset[str] | None) -> str:
+    if pravila is None:
+        return poruka("samoprovjera.nista")
+    return ", ".join(sorted(pravila)) or poruka("samoprovjera.nijedno")
+
+
+_STATUS_PRIMJERA = {
+    StatusPrimjera.PROLAZI: "samoprovjera.status_prolazi",
+    StatusPrimjera.NE_PROLAZI: "samoprovjera.status_ne_prolazi",
+    StatusPrimjera.PRESKOCENO: "samoprovjera.status_preskoceno",
+}
+
+
+def _status(rezultat: RezultatPrimjera) -> str:
+    status = poruka(_STATUS_PRIMJERA[rezultat.status])
+    if rezultat.razlog is None:
+        return status
+    return poruka(
+        "samoprovjera.status_razlog",
+        status=status,
+        razlog=poruka(rezultat.razlog, **rezultat.parametri),
+    )
+
+
+def prikazi_samoprovjeru(
+    odabrani: profil.Profil, rezultat: RezultatSamoprovjere | None
+) -> None:
+    st.subheader(poruka("samoprovjera.naslov"))
+    st.caption(poruka("samoprovjera.opis"))
+    st.button(
+        poruka("samoprovjera.pokreni"),
+        key="samoprovjera",
+        on_click=_pokreni_samoprovjeru,
+        args=(odabrani,),
+    )
+    if rezultat is None:
+        return
+    if isinstance(rezultat, GreskaReferentnog):
+        st.error(poruka(rezultat.poruka_kljuc, **rezultat.parametri), icon="❌")
+        return
+    if ukupno(rezultat):
+        st.success(poruka("samoprovjera.prolazi"), icon="✅")
+    else:
+        st.error(poruka("samoprovjera.ne_prolazi", broj=broj_odstupanja(rezultat)), icon="❌")
+    st.dataframe(
+        [
+            {
+                poruka("samoprovjera.stupac_primjer"): r.ime,
+                poruka("samoprovjera.stupac_ocekivano"): _skup(r.ocekivano),
+                poruka("samoprovjera.stupac_pronadeno"): _skup(r.pronadeno),
+                poruka("samoprovjera.stupac_status"): _status(r),
+            }
+            for r in rezultat
+        ],
+        hide_index=True,
+    )
+
+
 def prikazi_spremnost(
-    odabrani: profil.Profil, zamrznuti: tuple[Student, ...] | None
+    odabrani: profil.Profil,
+    zamrznuti: tuple[Student, ...] | None,
+    samoprovjera: RezultatSamoprovjere | None,
 ) -> spremnost.PregledSpremnosti:
     st.subheader(poruka("spremnost.naslov"))
     rbrovi = None if zamrznuti is None else [s.rbr for s in zamrznuti]
     aktivnih = 0 if zamrznuti is None else sum(s.aktivan for s in zamrznuti)
-    rezultat = spremnost.pregled(odabrani, rbrovi, aktivnih)
+    rezultati = (
+        NemaSkupa(samoprovjera.poruka_kljuc, samoprovjera.parametri)
+        if isinstance(samoprovjera, GreskaReferentnog)
+        else samoprovjera
+    )
+    rezultat = spremnost.pregled(odabrani, rbrovi, aktivnih, rezultati)
     if rezultat.margine_jedinstvene is None:
         margine = poruka("spremnost.margine_neprovjerene")
     elif rezultat.margine_jedinstvene:
@@ -393,7 +501,9 @@ mapa = podatkovna_mapa()
 vjezba = odabir_vjezbe()
 mapa_vjezbe = mapa / vjezba.vjezba.id
 zamrznuti = zamrznuti_popis(putanja_popisa(mapa_vjezbe))
-prikazi_spremnost(vjezba, zamrznuti)
+samoprovjera = rezultat_samoprovjere(vjezba)
+prikazi_spremnost(vjezba, zamrznuti, samoprovjera)
+prikazi_samoprovjeru(vjezba, samoprovjera)
 
 st.subheader(poruka("nastavnik.popis_naslov"))
 datoteka = st.file_uploader(poruka("nastavnik.ucitaj_popis"), type=["xlsx"], key="isvu")

@@ -1,5 +1,6 @@
 """Nastavnička aplikacija (priča 3.1): podatkovna mapa, odabir vježbe, učitavanje ISVU popisa."""
 
+import shutil
 import sys
 from pathlib import Path
 
@@ -87,8 +88,8 @@ def test_prikazuje_podatkovnu_mapu_i_odabir_vjezbe(aplikacija):
     assert at.text_input(key="podatkovna_mapa").value == str(Path.home() / "ProvjeraWord")
     assert at.selectbox(key="vjezba").options == ["Vježba 1"]
     assert at.file_uploader
-    # Jedino upozorenje: vježba nije spremna jer još nema zamrznutog popisa.
-    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    # Jedino upozorenje: vježba nije spremna (nema zamrznutog popisa, samoprovjera nije pokrenuta).
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=2)]
 
 
 @pytest.mark.parametrize("mapa", [".", "podaci", "tests/../podaci/x"])
@@ -102,7 +103,7 @@ def test_mapa_u_repozitoriju_zaustavlja_stranicu(aplikacija, mapa):
 
 def test_mapa_izvan_repozitorija_je_prihvacena(aplikacija, tmp_path):
     at = aplikacija.text_input(key="podatkovna_mapa").input(str(tmp_path / "Provjera")).run()
-    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=2)]
     assert at.selectbox(key="vjezba")
 
 
@@ -131,7 +132,7 @@ def test_nudi_i_neobjavljene_i_neispravne_vjezbe(monkeypatch):
         poruka("nastavnik.profil_neispravan", datoteka="a_neispravan.toml"),
         poruka("nastavnik.profil_neispravan", datoteka="z_duplikat.toml"),
     ]
-    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=2)]
     assert at.file_uploader
 
 
@@ -579,6 +580,10 @@ def test_spremnost_spremno(podaci, aplikacija):
     spremi(_sintetski_popis(range(1, 79)), _popis_csv(podaci))
     at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
     assert not at.exception
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert "- " + poruka("spremnost.samoprovjera_nije_pokrenuta") in _tekst(at)
+    at = at.button(key="samoprovjera").click().run()
+    assert not at.exception
     assert poruka("spremnost.naslov") in [s.value for s in at.subheader]
     vjezba = profil.ucitaj(VJEZBA_1.read_bytes())
     tekst = _tekst(at).replace("\\", "")
@@ -590,14 +595,16 @@ def test_spremnost_spremno(podaci, aplikacija):
     [status] = [s for s in at.success if s.value == poruka("spremnost.spremno")]
     assert status.icon == "✅"
     assert not at.error
+    assert not at.warning
 
 
 def test_spremnost_bez_popisa(u_mapi):
     at = u_mapi
     [status] = at.warning
-    assert status.value == poruka("spremnost.nije_spremno", broj=1)
+    assert status.value == poruka("spremnost.nije_spremno", broj=2)
     assert status.icon == "❌"
     assert "- " + poruka("spremnost.nema_popisa") in _tekst(at)
+    assert "- " + poruka("spremnost.samoprovjera_nije_pokrenuta") in _tekst(at)
     assert poruka("spremnost.margine_neprovjerene") in _tekst(at)
     assert not at.success
     assert not at.error  # „nije spremno“ je upozorenje, ne greška
@@ -608,7 +615,7 @@ def test_spremnost_prevelik_rbr(podaci, aplikacija):
     spremi(_sintetski_popis([1, 2, najveci + 1]), _popis_csv(podaci))
     at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
     assert not at.exception
-    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=2)]
     ocekivano = poruka("spremnost.rbr_izvan_raspona", rbrovi=str(najveci + 1), najveci=najveci)
     assert "- " + ocekivano in _tekst(at)
 
@@ -616,7 +623,7 @@ def test_spremnost_prevelik_rbr(podaci, aplikacija):
 def test_spremnost_bez_aktivnih(podaci, aplikacija):
     spremi(_sintetski_popis([1, 2], aktivan=False), _popis_csv(podaci))
     at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
-    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=2)]
     assert "- " + poruka("spremnost.nema_aktivnih") in _tekst(at)
 
 
@@ -627,7 +634,7 @@ def test_spremnost_sva_pravila_iskljucena(podaci, monkeypatch):
     at = AppTest.from_file(NASTAVNIK, default_timeout=30).run()
     at = at.text_input(key="podatkovna_mapa").input(str(podaci)).run()
     assert not at.exception
-    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=2)]
     assert "- " + poruka("spremnost.nema_pravila") in _tekst(at)
 
 
@@ -637,7 +644,163 @@ def test_spremnost_neaktivni_rbr_izvan_raspona(podaci, aplikacija):
     spremi(studenti, _popis_csv(podaci))
     at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
     assert not at.exception
-    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=2)]
     ocekivano = poruka("spremnost.rbr_izvan_raspona", rbrovi=str(najveci + 1), najveci=najveci)
     assert "- " + ocekivano in _tekst(at)
     assert poruka("spremnost.aktivnih", broj=1) in _tekst(at)
+
+
+# --- Samoprovjera (priča 3.4) -------------------------------------------------
+
+
+def _samoprovjera(at: AppTest) -> AppTest:
+    return at.button(key="samoprovjera").click().run()
+
+
+def test_samoprovjera_nije_pokrenuta(u_mapi):
+    at = u_mapi
+    assert poruka("samoprovjera.naslov") in [s.value for s in at.subheader]
+    gumb = at.button(key="samoprovjera")
+    assert gumb.label == poruka("samoprovjera.pokreni") == "Pokreni samoprovjeru"
+    assert gumb.label != poruka("samoprovjera.naslov")
+    assert not at.dataframe
+    assert "- " + poruka("spremnost.samoprovjera_nije_pokrenuta") in _tekst(at)
+
+
+def test_samoprovjera_prolazi_i_prikazuje_tablicu(u_mapi):
+    at = _samoprovjera(u_mapi)
+    assert not at.exception
+    assert poruka("samoprovjera.prolazi") in [s.value for s in at.success]
+    tablica = at.dataframe[0].value
+    assert list(tablica.columns) == [
+        poruka(f"samoprovjera.stupac_{s}")
+        for s in ("primjer", "ocekivano", "pronadeno", "status")
+    ]
+    assert len(tablica) == 45
+    assert set(tablica[poruka("samoprovjera.stupac_status")]) == {
+        poruka("samoprovjera.status_prolazi")
+    }
+    redak = tablica.set_index(poruka("samoprovjera.stupac_primjer")).loc["krive_margine_tijela"]
+    assert redak[poruka("samoprovjera.stupac_ocekivano")] == "R-MARGINE"
+    assert redak[poruka("samoprovjera.stupac_pronadeno")] == "R-MARGINE"
+    ispravan = tablica.set_index(poruka("samoprovjera.stupac_primjer")).loc["ispravan"]
+    assert ispravan[poruka("samoprovjera.stupac_ocekivano")] == poruka("samoprovjera.nijedno")
+    # Spremnost više ne navodi samoprovjeru (ostaje samo „nema popisa“).
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert poruka("spremnost.samoprovjera_nije_pokrenuta") not in _tekst(at)
+
+
+def test_samoprovjera_odstupanje(podaci, monkeypatch):
+    # Pogrešna izmjena profila: tolerancija margina (~2 mm, iznad pola koraka) propušta
+    # krive_margine_tijela. Validacija bi takav profil odbila, pa se zaobilazi model_copy.
+    ispravan = profil.ucitaj(VJEZBA_1.read_bytes())
+    tolerancije = ispravan.tolerancije.model_copy(update={"margine": 113})
+    labav = ispravan.model_copy(update={"tolerancije": tolerancije})
+    monkeypatch.setattr(profil, "ucitaj_sve", lambda _imenovani: [("vjezba_1.toml", labav)])
+    spremi(_sintetski_popis(range(1, 79)), _popis_csv(podaci))
+    at = AppTest.from_file(NASTAVNIK, default_timeout=60).run()
+    at = at.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    at = _samoprovjera(at)
+    assert not at.exception
+    assert [e.value for e in at.error] == [poruka("samoprovjera.ne_prolazi", broj=1)]
+    tablica = at.dataframe[0].value.set_index(poruka("samoprovjera.stupac_primjer"))
+    redak = tablica.loc["krive_margine_tijela"]
+    assert redak[poruka("samoprovjera.stupac_status")] == poruka("samoprovjera.status_ne_prolazi")
+    assert redak[poruka("samoprovjera.stupac_ocekivano")] == "R-MARGINE"
+    assert redak[poruka("samoprovjera.stupac_pronadeno")] == poruka("samoprovjera.nijedno")
+    assert [w.value for w in at.warning] == [poruka("spremnost.nije_spremno", broj=1)]
+    assert "- " + poruka("spremnost.samoprovjera_ne_prolazi", broj=1) in _tekst(at)
+
+
+def test_samoprovjera_iskljuceno_pravilo_preskace(monkeypatch):
+    ispravan = profil.ucitaj(VJEZBA_1.read_bytes())
+    pravila = dict(ispravan.pravila)
+    pravila["R-OKVIRI"] = pravila["R-OKVIRI"].model_copy(update={"ukljuceno": False})
+    bez_okvira = ispravan.model_copy(update={"pravila": pravila})
+    monkeypatch.setattr(profil, "ucitaj_sve", lambda _imenovani: [("vjezba_1.toml", bez_okvira)])
+    at = _samoprovjera(AppTest.from_file(NASTAVNIK, default_timeout=60).run())
+    assert not at.exception
+    assert poruka("samoprovjera.prolazi") in [s.value for s in at.success]
+    tablica = at.dataframe[0].value.set_index(poruka("samoprovjera.stupac_primjer"))
+    status = tablica[poruka("samoprovjera.stupac_status")]
+    assert status["okvir_tekst"] == poruka("samoprovjera.status_preskoceno")
+    assert status["okvir_naslov"] == poruka("samoprovjera.status_preskoceno")
+    assert status["tekst_font"] == poruka("samoprovjera.status_prolazi")
+
+
+def test_samoprovjera_bez_referentnog_skupa(monkeypatch):
+    _profili(monkeypatch, [("vjezba_7.toml", _toml("vjezba_7", "Vježba 7", True))])
+    at = _samoprovjera(AppTest.from_file(NASTAVNIK, default_timeout=30).run())
+    assert not at.exception
+    mapa = KORIJEN / "tests" / "referentni" / "vjezba_7"
+    razlog = poruka("samoprovjera.nema_skupa", mapa=str(mapa))
+    assert [e.value for e in at.error] == [razlog]
+    assert not at.dataframe
+    problem = poruka("spremnost.samoprovjera_nema_skupa", poruka=razlog)
+    assert "- " + problem.replace("\\", "") in _tekst(at).replace("\\", "")
+
+
+def test_promjena_profila_ponistava_samoprovjeru(monkeypatch):
+    datoteke = [("vjezba_1.toml", VJEZBA_1.read_bytes())]
+    _profili(monkeypatch, datoteke)
+    at = _samoprovjera(AppTest.from_file(NASTAVNIK, default_timeout=60).run())
+    assert poruka("samoprovjera.prolazi") in [s.value for s in at.success]
+    # Ista vježba, nova verzija profila (npr. promijenjena tolerancija).
+    datoteke[0] = (
+        "vjezba_1.toml",
+        _zamijeni(VJEZBA_1.read_bytes(), b'margine = "0,03 cm"', b'margine = "0,02 cm"'),
+    )
+    at = at.run()
+    assert not at.exception
+    assert poruka("samoprovjera.prolazi") not in [s.value for s in at.success]
+    assert not at.dataframe
+    assert "- " + poruka("spremnost.samoprovjera_nije_pokrenuta") in _tekst(at)
+
+
+def _privremeni_skup(tmp_path: Path, monkeypatch) -> Path:
+    """Kopija referentnog skupa Vježbe 1 u ``tmp_path``; aplikacija čita nju."""
+    from provjera.adapteri import samoprovjera as adapter
+
+    korijen = tmp_path / "referentni"
+    shutil.copytree(KORIJEN / "tests" / "referentni" / "vjezba_1", korijen / "vjezba_1")
+    pravi_pokreni, pravi_otisak = adapter.pokreni, adapter.otisak_skupa
+    monkeypatch.setattr(adapter, "pokreni", lambda p, _mapa: pravi_pokreni(p, korijen))
+    monkeypatch.setattr(adapter, "otisak_skupa", lambda v, _mapa: pravi_otisak(v, korijen))
+    return korijen / "vjezba_1"
+
+
+def test_samoprovjera_visak_i_manjak_datoteka(tmp_path, monkeypatch):
+    mapa = _privremeni_skup(tmp_path, monkeypatch)
+    shutil.copy(mapa / "ispravan.docx", mapa / "visak.docx")
+    (mapa / "tekst_font.docx").unlink()
+    at = _samoprovjera(AppTest.from_file(NASTAVNIK, default_timeout=60).run())
+    assert not at.exception
+    assert [e.value for e in at.error] == [poruka("samoprovjera.ne_prolazi", broj=2)]
+    tablica = at.dataframe[0].value.set_index(poruka("samoprovjera.stupac_primjer"))
+    ne_prolazi = poruka("samoprovjera.status_ne_prolazi")
+    visak, manjak = tablica.loc["visak"], tablica.loc["tekst_font"]
+    status = poruka("samoprovjera.stupac_status")
+    assert visak[status] == poruka(
+        "samoprovjera.status_razlog", status=ne_prolazi, razlog=poruka("samoprovjera.nema_zapisa")
+    )
+    assert manjak[status] == poruka(
+        "samoprovjera.status_razlog", status=ne_prolazi, razlog=poruka("samoprovjera.nema_datoteke")
+    )
+    nista = poruka("samoprovjera.nista")
+    assert visak[poruka("samoprovjera.stupac_ocekivano")] == nista
+    assert visak[poruka("samoprovjera.stupac_pronadeno")] == nista
+    assert manjak[poruka("samoprovjera.stupac_ocekivano")] == "R-TEKST"
+    assert manjak[poruka("samoprovjera.stupac_pronadeno")] == nista
+
+
+def test_promjena_referentnog_skupa_ponistava_samoprovjeru(tmp_path, monkeypatch):
+    mapa = _privremeni_skup(tmp_path, monkeypatch)
+    at = _samoprovjera(AppTest.from_file(NASTAVNIK, default_timeout=60).run())
+    assert poruka("samoprovjera.prolazi") in [s.value for s in at.success]
+    ocekivano = mapa / "ocekivano.toml"
+    ocekivano.write_bytes(ocekivano.read_bytes() + b"\n# izmjena\n")
+    at = at.run()
+    assert not at.exception
+    assert poruka("samoprovjera.prolazi") not in [s.value for s in at.success]
+    assert not at.dataframe
+    assert "- " + poruka("spremnost.samoprovjera_nije_pokrenuta") in _tekst(at)

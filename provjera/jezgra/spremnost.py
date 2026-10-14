@@ -1,7 +1,7 @@
 """Pregled spremnosti vježbe (priča 3.3): profil i zamrznuti popis prije objave.
 
-Čista funkcija bez I/O-a: aplikacija predaje Rbr. sa zamrznutog popisa i broj aktivnih
-studenata, a problemi su ključevi poruka s parametrima (prijevod radi ``poruke``).
+Čista funkcija bez I/O-a: aplikacija predaje Rbr. sa zamrznutog popisa, broj aktivnih
+studenata te rezultat samoprovjere (priča 3.4), a problemi su ključevi poruka s parametrima (prijevod radi ``poruke``).
 """
 
 from collections import Counter
@@ -12,6 +12,13 @@ from types import MappingProxyType
 from provjera.jezgra import formula
 from provjera.jezgra import profil as profil_modul
 from provjera.jezgra.profil import Profil
+from provjera.jezgra.poruke import poruka
+from provjera.jezgra.samoprovjera import (
+    NemaSkupa,
+    RezultatPrimjera,
+    broj_odstupanja,
+    ukupno,
+)
 
 
 @dataclass(frozen=True)
@@ -52,9 +59,14 @@ def _popis_rbrova(rbrovi: Sequence[int]) -> str:
 
 
 def pregled(
-    profil: Profil, rbrovi: Sequence[int] | None, broj_aktivnih: int
+    profil: Profil,
+    rbrovi: Sequence[int] | None,
+    broj_aktivnih: int,
+    samoprovjera: Sequence[RezultatPrimjera] | NemaSkupa | None,
 ) -> PregledSpremnosti:
-    """Računa spremnost; ``rbrovi`` je ``None`` kad zamrznutog popisa nema.
+    """Računa spremnost; ``rbrovi`` je ``None`` kad zamrznutog popisa nema, a
+    ``samoprovjera`` je ``None`` dok samoprovjera nije pokrenuta, a ``NemaSkupa`` kad
+    referentni skup nedostaje ili je neispravan.
 
     Jedinstvenost margina provjerava se za sve Rbr. na popisu (i neaktivne);
     Rbr. izvan raspona formule preskaču se jer su već prijavljeni kao problem.
@@ -95,6 +107,15 @@ def pregled(
     ukljucenih = sum(p.ukljuceno for p in profil.pravila.values())
     if not ukljucenih:
         problemi.append(Problem("spremnost.nema_pravila"))
+    if samoprovjera is None:
+        problemi.append(Problem("spremnost.samoprovjera_nije_pokrenuta"))
+    elif isinstance(samoprovjera, NemaSkupa):
+        razlog = poruka(samoprovjera.poruka_kljuc, **samoprovjera.parametri)
+        problemi.append(Problem("spremnost.samoprovjera_nema_skupa", {"poruka": razlog}))
+    elif not ukupno(samoprovjera):
+        problemi.append(
+            Problem("spremnost.samoprovjera_ne_prolazi", {"broj": broj_odstupanja(samoprovjera)})
+        )
     return PregledSpremnosti(
         naziv=profil.vjezba.naziv,
         verzija=profil_modul.verzija(profil),
