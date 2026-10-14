@@ -2,7 +2,7 @@
 
 Ključevi pravila imaju oblik ``<pravilo_id>.<slucaj>`` (npr. ``R-NAZIV.prolazi``),
 a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefiksu:
-``app.``, ``nastavnik.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
+``app.``, ``nastavnik.``, ``popis.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
 ``margine.``, ``naziv.``, ``ulaz.``, ``opce.``, ``status.``, ``izvjestaj.``,
 ``lokacija.``, ``izvor.``, ``sazetak.``, ``poravnanje.``, ``prored.`` i ``vrijednost.``.
 """
@@ -45,6 +45,54 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "i ništa se ne sprema: ni datoteka ni rezultat provjere."
         ),
         "nastavnik.naslov": "Provjera Word dokumenata – nastavnik",
+        "nastavnik.mapa": "Podatkovna mapa (popisi studenata i izdani podaci)",
+        "nastavnik.mapa_pomoc": (
+            "Mapa na ovom računalu u koju se spremaju popisi studenata. "
+            "Ne smije biti unutar repozitorija aplikacije."
+        ),
+        "nastavnik.mapa_prazna": "Upiši putanju podatkovne mape.",
+        "nastavnik.mapa_neispravna": (
+            "Putanja podatkovne mape nije ispravna. Upiši potpunu putanju mape "
+            "(npr. C:\\Users\\ime\\ProvjeraWord), a ne datoteke."
+        ),
+        "nastavnik.mapa_u_repozitoriju": (
+            "Podatkovna mapa je unutar repozitorija aplikacije, pa bi osobni podaci "
+            "studenata mogli završiti u gitu. Odaberi mapu izvan repozitorija."
+        ),
+        "nastavnik.mapa_odabrana": "Podaci se spremaju u: {mapa}",
+        "nastavnik.vjezba": "Vježba",
+        "nastavnik.vjezba_neobjavljena": "{naziv} (neobjavljena)",
+        "nastavnik.nema_profila": "Nema ispravnih profila vježbi u mapi profili/.",
+        "nastavnik.neispravni_profili": (
+            "Neispravnih profila koji se ne nude za odabir: {broj}."
+        ),
+        "nastavnik.popis_naslov": "Popis studenata iz ISVU-a",
+        "nastavnik.ucitaj_popis": "ISVU izvoz popisa studenata (.xlsx)",
+        "nastavnik.popis_ispravan": "Popis je ispravan.",
+        "nastavnik.popis_neispravan": (
+            "Popis ima pogrešaka ({broj}) i ne može se zamrznuti. Ispravi ih u izvozu "
+            "i učitaj ga ponovno."
+        ),
+        "nastavnik.stupac_rbr": "Rbr.",
+        "nastavnik.stupac_jmbag": "JMBAG",
+        "nastavnik.stupac_ime": "Ime",
+        "nastavnik.stupac_prezime": "Prezime",
+        "nastavnik.stupac_aktivan": "Aktivan",
+        "popis.broj_studenata": "Studenata: {broj}",
+        "popis.broj_neaktivnih": "Neaktivnih (ispisanih): {broj}",
+        "popis.redak": "Redak {redak}: {poruka}",
+        "popis.necitljiv": "Datoteka nije čitljiva .xlsx tablica.",
+        "popis.bez_zaglavlja": (
+            "Zaglavlje popisa nije pronađeno u prvih {najvise} redaka. Nedostaju stupci: {stupci}."
+        ),
+        "popis.bez_studenata": "Popis ne sadrži nijednog studenta.",
+        "popis.rbr_neispravan": "Rbr. nije pozitivan cijeli broj.",
+        "popis.dupli_rbr": "Rbr. {rbr} već se pojavio u retku {prvi}.",
+        "popis.dupli_jmbag": "Isti JMBAG već se pojavio u retku {prvi}.",
+        "popis.prazan_jmbag": "JMBAG je prazan.",
+        "popis.jmbag_neispravan": "JMBAG mora imati točno 10 znamenki.",
+        "popis.prazno_ime": "Ime je prazno.",
+        "popis.prazno_prezime": "Prezime je prazno.",
         "profil.nedostupno": (
             "Provjera trenutno nije dostupna. Pokušaj kasnije ili se javi nastavniku."
         ),

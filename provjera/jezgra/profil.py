@@ -136,6 +136,26 @@ def objavljeni(sadrzaji: Iterable[bytes]) -> tuple[list[Profil], int]:
     return profili, neispravnih
 
 
+def svi(sadrzaji: Iterable[bytes]) -> tuple[list[Profil], int]:
+    """Kao ``objavljeni``, ali uključuje i neobjavljene profile (nastavnička aplikacija).
+
+    Profil s već viđenim ``vjezba.id`` broji se kao neispravan.
+    """
+    profili, neispravnih, ids = [], 0, set()
+    for sadrzaj in sadrzaji:
+        try:
+            profil = ucitaj(sadrzaj)
+        except GreskaProfila:
+            neispravnih += 1
+            continue
+        if profil.vjezba.id in ids:
+            neispravnih += 1
+            continue
+        ids.add(profil.vjezba.id)
+        profili.append(profil)
+    return profili, neispravnih
+
+
 def verzija(profil: Profil) -> str:
     """Verzija iz sadržaja: ne mijenja se s redoslijedom ključeva ni komentarima."""
     return hashlib.sha256(kanonski_json(profil.model_dump(mode="json"))).hexdigest()[:8]
