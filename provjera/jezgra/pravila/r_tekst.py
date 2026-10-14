@@ -126,7 +126,9 @@ def _odlomak(o: Odlomak, p: Postavke) -> list[Nalaz]:
 def provjeri(model: DocModel, kontekst: KontekstProvjere, postavke: Postavke, profil: "Profil") -> list[Nalaz]:
     odlomci = [o for o in model.odlomci if o.uloga is UlogaOdlomka.OSNOVNI_TEKST]
     parametri = {"stil": postavke.stil}
-    if not odlomci:
+    # Osnovni tekst samo u tekstnom okviru prijavljuje R-OKVIRI, ne „nema teksta“.
+    u_okviru = any(o.uloga is UlogaOdlomka.OSNOVNI_TEKST for o in model.okviri)
+    if not odlomci and not u_okviru:
         return [Nalaz(ID, Status.NE_PROLAZI, Lokacija(Dio.DOKUMENT), f"{ID}.nema_teksta", parametri=parametri)]
     nalazi = [n for o in odlomci for n in _odlomak(o, postavke)]
     return nalazi or [Nalaz(ID, Status.PROSLO, Lokacija(Dio.DOKUMENT), f"{ID}.prolazi", parametri=parametri)]

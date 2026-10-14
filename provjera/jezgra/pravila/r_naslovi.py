@@ -190,6 +190,9 @@ def provjeri(model: DocModel, kontekst: KontekstProvjere, postavke: Postavke, pr
         elif o.uloga in _NASLOVI:
             pronadeni.add(normaliziraj_naziv(bez_rucnog_broja(o.tekst)))
             nalazi += _naslov(o, postavke, redni)
+    # Naslov u tekstnom okviru postoji; uvjet „u okviru“ prijavljuje samo R-OKVIRI.
+    pronadeni |= {normaliziraj_naziv(bez_rucnog_broja(o.tekst))
+                  for o in model.okviri if o.uloga in _NASLOVI}
     for naziv, normaliziran in zip(profil.uloge.poglavlja, poglavlja):
         if normaliziran not in pronadeni:
             nalazi.append(Nalaz(ID, Status.NE_PROLAZI, Lokacija(Dio.DOKUMENT), f"{ID}.nedostaje",

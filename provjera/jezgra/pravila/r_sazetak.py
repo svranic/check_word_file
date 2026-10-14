@@ -98,6 +98,9 @@ def provjeri(model: DocModel, kontekst: KontekstProvjere, postavke: Postavke, pr
         return next((i for i, o in enumerate(model.odlomci) if o.uloga in uloge), None)
 
     naslov = prvi((UlogaOdlomka.NASLOV_SAZETKA,))
+    if naslov is None and any(o.uloga is UlogaOdlomka.NASLOV_SAZETKA for o in model.okviri):
+        # Naslov u tekstnom okviru prijavljuje samo R-OKVIRI.
+        return [Nalaz(ID, Status.PROSLO, Lokacija(Dio.DOKUMENT), f"{ID}.prolazi")]
     if naslov is None:
         # Bez naslova se ne zna što je sažetak (npr. naslovnica u jedinoj sekciji je
         # također ispred prvog poglavlja), pa se svojstva ne provjeravaju.

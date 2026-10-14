@@ -4,6 +4,7 @@ Pokretanje: ``uv run python tests/alati/generator.py`` zapisuje .docx primjere u
 ``tests/referentni/vjezba_1/``. Imena u dokumentima su izmišljena.
 """
 
+import copy
 import io
 import re
 import zipfile
@@ -511,6 +512,115 @@ def _broj_okvir(dokument, rbr, profil):
     vanjski._p.append(run)
 
 
+# --- praćene promjene i tekstni okviri (priča 2.6) -----------------------------------
+
+_PROMJENA = 'w:author="Ana Horvat" w:date="2026-10-14T10:00:00Z"'
+
+
+def _umetni_promjenu(odlomak, xml: str) -> None:
+    """Dodaje XML promjene (s ``{w}`` za imenski prostor) na kraj odlomka."""
+    odlomak._p.append(parse_xml(xml.format(w=nsdecls("w"))))
+
+
+def _promjene_umetanje(dokument, rbr, profil):
+    """Rečenica umetnuta uz praćenje promjena (w:ins)."""
+    _umetni_promjenu(_prvi_osnovni(dokument), (
+        f'<w:ins {{w}} w:id="901" {_PROMJENA}><w:r>'
+        '<w:t xml:space="preserve"> Ova je rečenica umetnuta uz praćenje promjena.</w:t></w:r></w:ins>'
+    ))
+
+
+def _promjene_brisanje(dokument, rbr, profil):
+    """Izbrisan run u fontu Arial (w:del): u prihvaćenom stanju ne postoji."""
+    _umetni_promjenu(_prvi_osnovni(dokument), (
+        f'<w:del {{w}} w:id="902" {_PROMJENA}><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/>'
+        '<w:sz w:val="28"/></w:rPr><w:delText xml:space="preserve"> Izbrisani tekst.</w:delText></w:r></w:del>'
+    ))
+
+
+def _promjene_oblik(dokument, rbr, profil):
+    """Promjena oblikovanja (w:rPrChange): prije Arial, sada font iz stila Normal."""
+    _umetni_promjenu(_prvi_osnovni(dokument), (
+        f'<w:r {{w}}><w:rPr><w:rPrChange w:id="903" {_PROMJENA}><w:rPr>'
+        '<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="28"/></w:rPr></w:rPrChange></w:rPr>'
+        '<w:t xml:space="preserve"> Ovim riječima promijenjen je font.</w:t></w:r>'
+    ))
+
+
+_NS_OKVIRA = (
+    'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
+    'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+    'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" '
+    f'xmlns:v="{_VML}"'
+)
+
+
+def okvir_run(odlomci: list) -> object:
+    """Run s tekstnim okvirom kako ga zapisuje Word: DrawingML (``mc:Choice``) i VML (``mc:Fallback``).
+
+    ``odlomci`` su elementi ``w:p``; u Fallback grani su njihove kopije.
+    """
+    run = parse_xml(
+        f'<w:r {nsdecls("w")} {_NS_OKVIRA}><mc:AlternateContent>'
+        '<mc:Choice Requires="wps"><w:drawing>'
+        '<wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="1" '
+        'behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/>'
+        '<wp:positionH relativeFrom="column"><wp:posOffset>0</wp:posOffset></wp:positionH>'
+        '<wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>'
+        '<wp:extent cx="3600000" cy="720000"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapSquare wrapText="bothSides"/>'
+        '<wp:docPr id="501" name="Tekstni okvir 1"/><wp:cNvGraphicFramePr/>'
+        '<a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">'
+        '<wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="3600000" cy="720000"/>'
+        '</a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr>'
+        '<wps:txbx><w:txbxContent/></wps:txbx><wps:bodyPr/></wps:wsp>'
+        '</a:graphicData></a:graphic></wp:anchor></w:drawing></mc:Choice>'
+        '<mc:Fallback><w:pict><v:shape id="Okvir501" type="#_x0000_t202" style="width:283pt;height:57pt">'
+        '<v:textbox><w:txbxContent/></v:textbox></v:shape></w:pict></mc:Fallback>'
+        "</mc:AlternateContent></w:r>"
+    )
+    izbor, zamjena = run.iter(qn("w:txbxContent"))
+    for p in odlomci:
+        izbor.append(p)
+        zamjena.append(copy.deepcopy(p))
+    return run
+
+
+def _sidro_okvira(prije, odlomci: list) -> None:
+    """Novi prazan odlomak s okvirom ispred ``prije`` (w:p); ``odlomci`` idu u okvir."""
+    sidro = OxmlElement("w:p")
+    sidro.append(okvir_run(odlomci))
+    prije.addprevious(sidro)
+
+
+def _okvir_naslov(dokument, rbr, profil):
+    """Naslov „Zaključak“ (Heading 1) premješten u tekstni okvir u tijelu."""
+    naslov = _naslov(dokument, profil, 2)._p
+    sljedeci = naslov.getnext()
+    naslov.getparent().remove(naslov)
+    _sidro_okvira(sljedeci, [naslov])
+
+
+def _okvir_tekst(dokument, rbr, profil):
+    """Odlomak osnovnog teksta (≥ 40 znakova) u tekstnom okviru u tijelu."""
+    odlomak = dokument.add_paragraph(
+        "Ovaj odlomak osnovnog teksta napisan je u tekstnom okviru umjesto u tijelu rada."
+    )._p
+    odlomak.getparent().remove(odlomak)
+    _sidro_okvira(_prvi_osnovni(dokument)._p.getnext(), [odlomak])
+
+
+def _okvir_naslovnica(dokument, rbr, profil):
+    """Naslov rada u tekstnom okviru na naslovnici: dopušteno."""
+    naslov = dokument.add_paragraph(profil.uloge.poglavlja[1], style="Title")._p
+    naslov.getparent().remove(naslov)
+    tekst = dokument.add_paragraph(
+        "Seminarski rad iz kolegija Osnove geoinformatike, napisan u tekstnom okviru."
+    )._p
+    tekst.getparent().remove(tekst)
+    _sidro_okvira(dokument.paragraphs[0]._p, [naslov, tekst])
+
+
 VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "ispravan": ispravan,
     "jedna_sekcija": lambda rbr, profil: _spremi(_dokument(rbr, profil, jedna_sekcija=True)),
@@ -551,6 +661,12 @@ VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "broj_font": _izmijeni(_broj_font),
     "broj_galerija": _izmijeni(_broj_galerija),
     "broj_okvir": _izmijeni(_broj_okvir),
+    "promjene_umetanje": _izmijeni(_promjene_umetanje),
+    "promjene_brisanje": _izmijeni(_promjene_brisanje),
+    "promjene_oblik": _izmijeni(_promjene_oblik),
+    "okvir_naslov": _izmijeni(_okvir_naslov),
+    "okvir_tekst": _izmijeni(_okvir_tekst),
+    "okvir_naslovnica": _izmijeni(_okvir_naslovnica),
 }
 
 

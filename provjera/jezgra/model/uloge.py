@@ -98,6 +98,39 @@ def _je_ostalo(z: ZnacajkeOdlomka) -> bool:
     )
 
 
+# Odlomak okvira s barem toliko znakova teksta je osnovni tekst; kraće oznake su dopuštene.
+NAJMANJE_ZNAKOVA_TEKSTA_OKVIRA = 40
+
+
+# Opis slike ili tablice („Slika 1.“, „Tablica 2:“) smije ostati u okviru i kad je dug.
+_OPIS_U_OKVIRU = re.compile(r"^\s*(?:slika|tablica|grafikon|figure|table)\s*\d+", re.IGNORECASE)
+
+
+def uloga_okvira(kanonski_stil: str, tekst: str, nazivi: NaziviUloga) -> UlogaOdlomka:
+    """Uloga odlomka tekstnog okvira ili oblika u sekciji tijela (R-OKVIRI).
+
+    Naziv „Sažetak“ ili „Literatura“ daje njihov naslov; naslov poglavlja je odlomak u
+    stilu Heading 1 ili s nazivom poglavlja iz ``[uloge]``; opis slike ili tablice je
+    OSTALO; osnovni tekst je odlomak s barem ``NAJMANJE_ZNAKOVA_TEKSTA_OKVIRA`` znakova.
+    """
+    if not tekst.strip():
+        return UlogaOdlomka.OSTALO
+    naziv = normaliziraj_naziv(bez_rucnog_broja(tekst))
+    literatura = normaliziraj_naziv(nazivi.literatura)
+    if naziv == normaliziraj_naziv(nazivi.sazetak):
+        return UlogaOdlomka.NASLOV_SAZETKA
+    if naziv == literatura:
+        return UlogaOdlomka.NASLOV_LITERATURE
+    poglavlja = {normaliziraj_naziv(p) for p in nazivi.poglavlja} | {literatura}
+    if kanonski_stil == _NASLOV_POGLAVLJA or naziv in poglavlja:
+        return UlogaOdlomka.NASLOV_POGLAVLJA
+    if kanonski_stil in _OPIS_SLIKE or _OPIS_U_OKVIRU.match(tekst):
+        return UlogaOdlomka.OSTALO
+    if len(tekst.strip()) >= NAJMANJE_ZNAKOVA_TEKSTA_OKVIRA:
+        return UlogaOdlomka.OSNOVNI_TEKST
+    return UlogaOdlomka.OSTALO
+
+
 def uloge_odlomaka(
     znacajke: Sequence[ZnacajkeOdlomka], nazivi: NaziviUloga
 ) -> tuple[UlogaOdlomka, ...]:

@@ -511,6 +511,32 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Izmijeni (Modify) → Oblikovanje (Formatting) → {ocekivano}. Ako je veličina "
             "zadana ručno, označi broj u podnožju i pritisni Ctrl+Space."
         ),
+        "pravilo.R-PROMJENE": "Praćene promjene",
+        "R-PROMJENE.prolazi": "Dokument nema praćenih promjena.",
+        "R-PROMJENE.prisutne": (
+            "Dokument sadrži praćene promjene (umetnut, izbrisan ili premješten tekst ili "
+            "promijenjeno oblikovanje) koje nisu prihvaćene. Ono što vidiš na zaslonu možda "
+            "nije ono što će se ocjenjivati. Ostale provjere ocijenile su rad kao da su sve "
+            "promjene prihvaćene. Prihvati ih i isključi praćenje: Pregled (Review) → "
+            "Prihvati (Accept) → Prihvati sve promjene i zaustavi praćenje (Accept All Changes "
+            "and Stop Tracking)."
+        ),
+        "pravilo.R-OKVIRI": "Tekstni okviri",
+        "R-OKVIRI.prolazi": "Naslovi i osnovni tekst nisu u tekstnim okvirima.",
+        "R-OKVIRI.naslov_u_okviru": (
+            "Naslov (sažetka, poglavlja ili literature) nalazi se u tekstnom okviru ili obliku, "
+            "a ne u tijelu dokumenta. Tekst u okviru ne pripada toku dokumenta: ne ulazi u "
+            "sadržaj (Table of Contents), ne numerira se i provjera stilova ga ne vidi. Označi "
+            "tekst u okviru, izreži ga (Ctrl+X), obriši okvir, a tekst zalijepi (Ctrl+V) na "
+            "pravo mjesto u tijelu dokumenta i primijeni stil kakav taj naslov treba imati."
+        ),
+        "R-OKVIRI.tekst_u_okviru": (
+            "Osnovni tekst nalazi se u tekstnom okviru ili obliku, a ne u tijelu dokumenta. "
+            "Tekst u okviru ne pripada toku dokumenta i provjera stilova ga ne vidi. Označi "
+            "tekst u okviru, izreži ga (Ctrl+X), obriši okvir, a tekst zalijepi (Ctrl+V) na "
+            "pravo mjesto u tijelu dokumenta i primijeni stil osnovnog teksta. Kratke oznake i "
+            "opisi slika smiju ostati u okviru."
+        ),
         "poravnanje.lijevo": "lijevo (Align Left)",
         "poravnanje.sredina": "centrirano (Center)",
         "poravnanje.desno": "desno (Align Right)",

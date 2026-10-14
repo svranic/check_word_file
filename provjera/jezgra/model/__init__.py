@@ -17,6 +17,7 @@ from docx.oxml.ns import qn
 from docx.oxml.parser import parse_xml
 
 from provjera.jezgra.model.numeracija import Brojaci, Numeracija
+from provjera.jezgra.model.promjene import izbrisana_oznaka, okviri_odlomka, pracene_promjene
 from provjera.jezgra.model.podnozja import (
     Podnozje,
     PodnozjaSekcije,
@@ -39,6 +40,7 @@ from provjera.jezgra.model.uloge import (
     Uloga,
     UlogaOdlomka,
     ZnacajkeOdlomka,
+    uloga_okvira,
     uloge_odlomaka,
     uloge_sekcija,
 )
@@ -50,6 +52,7 @@ __all__ = [
     "NepodrzaniDokument",
     "Numeracija",
     "Odlomak",
+    "OdlomakOkvira",
     "Podnozje",
     "PodnozjaSekcije",
     "PoljeStranice",
@@ -137,12 +140,32 @@ class Odlomak:
 
 
 @dataclass(frozen=True)
+class OdlomakOkvira:
+    """Odlomak tekstnog okvira ili oblika (``w:txbxContent``) u sekciji tijela.
+
+    Okviri nisu u ``DocModel.odlomci``: njihov sadržaj prijavljuje samo R-OKVIRI.
+    """
+
+    sekcija: int
+    tekst: str
+    isjecak: str | None
+    kanonski_stil: str
+    # Naslov (sažetka, poglavlja, literature), OSNOVNI_TEKST ili OSTALO (``uloge.uloga_okvira``).
+    uloga: UlogaOdlomka
+
+
+@dataclass(frozen=True)
 class DocModel:
     sekcije: tuple[Sekcija, ...] = ()
     zrcalne_margine: bool = False
     odlomci: tuple[Odlomak, ...] = ()
     # w:evenAndOddHeaders u postavkama: drukčije parne i neparne stranice.
     parna_neparna: bool = False
+    # Broj elemenata praćenih promjena (w:ins, w:del, w:moveFrom, w:moveTo, *PrChange …)
+    # u tijelu, zaglavljima, podnožjima, fusnotama i endnotama. Sve ostalo u modelu je prihvaćeno stanje.
+    pracene_promjene: int = 0
+    # Odlomci tekstnih okvira i oblika u sekcijama tijela (naslovnica se ne provjerava).
+    okviri: tuple[OdlomakOkvira, ...] = ()
 
 
 def _twips(duljina: int | None) -> int | None:
@@ -336,12 +359,43 @@ def _numeracije(sirovi: list[_Sirovi], brojaci: Brojaci) -> list[Efektivno[Numer
     ]
 
 
-def _odlomci(dokument, uloge_sek: tuple[Uloga, ...], nazivi: NaziviUloga, stilovi: Stilovi) -> tuple[Odlomak, ...]:
+def _ne_postoji(p, s: _Sirovi) -> bool:
+    """Prihvaćeno stanje: odlomak s izbrisanom oznakom bez neizbrisanog teksta i slike ne postoji.
+
+    Spajanje takvog odlomka sa sljedećim se ne modelira.
+    """
+    return not s.tekst.strip() and not s.ima_sliku and izbrisana_oznaka(p)
+
+
+def _okviri(p, sekcija: int, stilovi: Stilovi, nazivi: NaziviUloga) -> Iterator[OdlomakOkvira]:
+    for unutarnji in okviri_odlomka(p):
+        s = _odlomak(unutarnji, sekcija, False, False, stilovi)
+        if _ne_postoji(unutarnji, s):
+            continue
+        kanonski = stilovi.stil(s.stil_id).kanonski_id
+        yield OdlomakOkvira(
+            sekcija=sekcija,
+            tekst=s.tekst,
+            isjecak=s.tekst.strip()[:_NAJVECI_ISJECAK] or None,
+            kanonski_stil=kanonski,
+            uloga=uloga_okvira(kanonski, s.tekst, nazivi),
+        )
+
+
+def _odlomci(
+    dokument, uloge_sek: tuple[Uloga, ...], nazivi: NaziviUloga, stilovi: Stilovi
+) -> tuple[tuple[Odlomak, ...], tuple[OdlomakOkvira, ...]]:
     tijelo = dokument.element.body
     zadnja = max(len(uloge_sek), 1)
-    sirovi, sekcija = [], 1
+    sirovi, okviri, sekcija = [], [], 1
     for p, u_tablici, u_sadrzaju in _odlomci_spremnika(tijelo, False, False):
-        sirovi.append(_odlomak(p, min(sekcija, zadnja), u_tablici, u_sadrzaju, stilovi))
+        trenutna = min(sekcija, zadnja)
+        s = _odlomak(p, trenutna, u_tablici, u_sadrzaju, stilovi)
+        if not _ne_postoji(p, s):
+            sirovi.append(s)
+        # Okviri na naslovnici se ne provjeravaju.
+        if (uloge_sek[trenutna - 1] if uloge_sek else Uloga.TIJELO) is Uloga.TIJELO:
+            okviri += _okviri(p, trenutna, stilovi, nazivi)
         # Sekciju završava odlomak tijela s w:sectPr (kao dokument.sections u python-docx).
         if p.getparent() is tijelo and p.find(f"{qn('w:pPr')}/{qn('w:sectPr')}") is not None:
             sekcija += 1
@@ -359,7 +413,7 @@ def _odlomci(dokument, uloge_sek: tuple[Uloga, ...], nazivi: NaziviUloga, stilov
     ]
     uloge = uloge_odlomaka(znacajke, nazivi)
     numeracije = _numeracije(sirovi, _brojaci(dokument))
-    return tuple(
+    odlomci = tuple(
         Odlomak(
             indeks=i + 1,
             sekcija=s.sekcija,
@@ -380,6 +434,7 @@ def _odlomci(dokument, uloge_sek: tuple[Uloga, ...], nazivi: NaziviUloga, stilov
         )
         for i, (s, uloga, numeracija) in enumerate(zip(sirovi, uloge, numeracije))
     )
+    return odlomci, tuple(okviri)
 
 
 def procitaj(sadrzaj: bytes, nazivi: NaziviUloga) -> DocModel:
@@ -401,11 +456,14 @@ def procitaj(sadrzaj: bytes, nazivi: NaziviUloga) -> DocModel:
     uloge = uloge_sekcija(len(sekcije))
     stilovi = _stilovi(dokument)
     podnozja = podnozja_sekcija(dokument.part, [s._sectPr for s in sekcije], stilovi)
+    odlomci, okviri = _odlomci(dokument, uloge, nazivi, stilovi)
     return DocModel(
         sekcije=tuple(
             _sekcija(i + 1, uloga, s, p) for i, (uloga, s, p) in enumerate(zip(uloge, sekcije, podnozja))
         ),
         zrcalne_margine=_zrcalne_margine(dokument),
-        odlomci=_odlomci(dokument, uloge, nazivi, stilovi),
+        odlomci=odlomci,
         parna_neparna=_parna_neparna(dokument),
+        pracene_promjene=pracene_promjene(dokument),
+        okviri=okviri,
     )

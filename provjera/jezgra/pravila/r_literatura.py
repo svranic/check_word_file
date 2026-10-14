@@ -55,6 +55,9 @@ _CILJEVI = ("font", "velicina")
 )
 def provjeri(model: DocModel, kontekst: KontekstProvjere, postavke: Postavke, profil: "Profil") -> list[Nalaz]:
     odlomci = [o for o in model.odlomci if o.uloga is UlogaOdlomka.LITERATURA]
+    if not odlomci and any(o.uloga is UlogaOdlomka.NASLOV_LITERATURE for o in model.okviri):
+        # Naslov u tekstnom okviru prijavljuje samo R-OKVIRI.
+        return [Nalaz(ID, Status.PROSLO, Lokacija(Dio.DOKUMENT), f"{ID}.prolazi")]
     if not odlomci:
         return [Nalaz(ID, Status.NE_PROLAZI, Lokacija(Dio.DOKUMENT), f"{ID}.nema_stavki",
                       parametri={"naziv": profil.uloge.literatura})]

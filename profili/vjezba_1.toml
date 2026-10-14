@@ -104,3 +104,12 @@ ukljuceno = true
 # svake sekcije rada; naslovnica nema broj. Provjerava se font i veličina samog broja.
 font = "Calibri"
 velicina = "10 pt"
+
+[pravila.R-PROMJENE]
+# Neprihvaćene praćene promjene; ostala pravila procjenjuju prihvaćeno stanje.
+ukljuceno = true
+
+[pravila.R-OKVIRI]
+# Naslovi poglavlja i osnovni tekst (barem 40 znakova) ne smiju biti u tekstnim okvirima
+# ni oblicima u tijelu rada; kratke oznake su dopuštene, naslovnica se ne provjerava.
+ukljuceno = true

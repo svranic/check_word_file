@@ -120,3 +120,21 @@ padaju = []
 
 [primjeri.broj_okvir]
 padaju = []
+
+[primjeri.promjene_umetanje]
+padaju = ["R-PROMJENE"]
+
+[primjeri.promjene_brisanje]
+padaju = ["R-PROMJENE"]
+
+[primjeri.promjene_oblik]
+padaju = ["R-PROMJENE"]
+
+[primjeri.okvir_naslov]
+padaju = ["R-OKVIRI"]
+
+[primjeri.okvir_tekst]
+padaju = ["R-OKVIRI"]
+
+[primjeri.okvir_naslovnica]
+padaju = []
