@@ -14,6 +14,16 @@ from types import MappingProxyType
 from provjera.jezgra.jedinice import Jedinica, RETCI_PO_RETKU, retci_u_broj, twips_u_cm, twips_u_pt
 from provjera.jezgra.nalaz import Izvor, Lokacija, Nalaz, Vrijednost
 
+# Zajednička uputa R-STILOVI: svojstvo se mijenja u stilu, a ručno oblikovanje uklanja.
+_UPUTA_STILOVI = (
+    " Ručno oblikovanje vrijedi samo za taj tekst i ne mijenja se kad promijeniš stil. "
+    "Ako treba, promijeni svojstvo u stilu: Početna (Home) → Stilovi (Styles) → desni klik "
+    "na stil → Izmijeni (Modify). Zatim označi tekst i ukloni ručno oblikovanje: Ctrl+Space "
+    "za znakove (font, veličina) i Ctrl+Q za odlomak (poravnanje, razmaci, prored, uvlake). "
+    "Ctrl+Space uklanja i podebljanje, kurziv i podcrtavanje, pa ih nakon toga ponovno "
+    "primijeni na riječi gdje su potrebni."
+)
+
 KATALOG: Mapping[str, str] = MappingProxyType(
     {
         "app.naslov": "Provjera Word dokumenata",
@@ -396,6 +406,35 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "stavke i odaberi Početna (Home) → Veličina fonta (Font Size) → {ocekivano}, ili "
             "veličinu promijeni u stilu stavki."
         ),
+        "pravilo.R-STILOVI": "Korištenje stilova",
+        "R-STILOVI.prolazi": (
+            "Osnovni tekst i naslovi oblikovani su kroz stilove, bez ručnog oblikovanja."
+        ),
+        # Bez {pronadeno}: font teme zadan ručno može biti bez imena u temi.
+        "R-STILOVI.izravni_font": (
+            "Font je zadan ručno, a ne kroz stil, čak i ako je ispravan (i kad je odabran font "
+            "teme, npr. „(Body)“ s popisa fontova)." + _UPUTA_STILOVI
+        ),
+        "R-STILOVI.izravna_velicina": (
+            "Veličina fonta ({pronadeno}) zadana je ručno, a ne kroz stil, čak i ako je ispravna."
+            + _UPUTA_STILOVI
+        ),
+        "R-STILOVI.izravno_poravnanje": (
+            "Poravnanje ({pronadeno}) zadano je ručno, a ne kroz stil, čak i ako je ispravno."
+            + _UPUTA_STILOVI
+        ),
+        "R-STILOVI.izravni_razmak": (
+            "Razmak {strana} odlomka ({pronadeno}) zadan je ručno, a ne kroz stil, čak i "
+            "ako je ispravan." + _UPUTA_STILOVI
+        ),
+        "R-STILOVI.izravni_prored": (
+            "Prored ({pronadeno}) zadan je ručno, a ne kroz stil, čak i ako je ispravan."
+            + _UPUTA_STILOVI
+        ),
+        "R-STILOVI.izravna_uvlaka": (
+            "Uvlaka odlomka ({strana}: {pronadeno}) zadana je ručno, a ne kroz stil, čak i ako "
+            "je ispravna." + _UPUTA_STILOVI
+        ),
         "poravnanje.lijevo": "lijevo (Align Left)",
         "poravnanje.sredina": "centrirano (Center)",
         "poravnanje.desno": "desno (Align Right)",
@@ -420,6 +459,7 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "izvjestaj.ocekivano": "Očekivano: {vrijednost}",
         "izvjestaj.pronadeno": "Pronađeno: {vrijednost}",
         "izvjestaj.pojave": "Ponavlja se {pojave} puta.",
+        "izvjestaj.primjeri": "Primjeri: {primjeri}",
         "izvjestaj.tehnicki_detalji": "Tehnički detalji",
         "izvjestaj.izvor": "Izvor vrijednosti: {izvor}",
         "izvjestaj.verzija_profila": "Verzija profila: {verzija}",

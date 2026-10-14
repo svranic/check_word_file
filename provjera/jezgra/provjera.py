@@ -7,6 +7,7 @@ from provjera.jezgra.nalaz import Dio, Izvjestaj, KontekstProvjere, Lokacija, Na
 from provjera.jezgra.pravila import REGISTAR
 from provjera.jezgra.profil import Profil, verzija
 
+_NAJVISE_PRIMJERA = 3
 _POREDAK = {Status.PROSLO: 0, Status.NE_PROLAZI: 1, Status.NEPROVJERLJIVO: 2}
 
 
@@ -21,7 +22,11 @@ def _neprovjerljivo(pravilo_id: str, razlog: str) -> Nalaz:
 
 
 def _sazmi(nalazi: list[Nalaz]) -> list[Nalaz]:
-    """Spaja ponavljanja istog nalaza u jedan, uz prvu lokaciju i zbroj pojava."""
+    """Spaja ponavljanja istog nalaza u jedan, uz prvu lokaciju, zbroj pojava i primjere.
+
+    ``primjeri`` sadrže do ``_NAJVISE_PRIMJERA`` različitih lokacija spojenih nalaza,
+    uključujući prvu; nalaz bez ponavljanja ostaje nepromijenjen.
+    """
     grupe: dict[tuple, Nalaz] = {}
     for n in nalazi:
         kljuc = (
@@ -30,7 +35,11 @@ def _sazmi(nalazi: list[Nalaz]) -> list[Nalaz]:
         )
         if kljuc in grupe:
             prvi = grupe[kljuc]
-            grupe[kljuc] = replace(prvi, pojave=prvi.pojave + n.pojave)
+            primjeri = list(prvi.primjeri or (prvi.lokacija,))
+            for lokacija in n.primjeri or (n.lokacija,):
+                if len(primjeri) < _NAJVISE_PRIMJERA and lokacija not in primjeri:
+                    primjeri.append(lokacija)
+            grupe[kljuc] = replace(prvi, pojave=prvi.pojave + n.pojave, primjeri=tuple(primjeri))
         else:
             grupe[kljuc] = n
     return list(grupe.values())

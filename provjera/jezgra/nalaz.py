@@ -71,6 +71,8 @@ class Nalaz:
     # Vrijednost u parametrima formatira poruke.tekst_nalaza (npr. sve četiri margine).
     parametri: Mapping[str, Parametar] = field(default_factory=dict)
     pojave: int = 1
+    # Do nekoliko lokacija sažetih ponavljanja (uključujući ``lokacija``); puni ih samo pokretač.
+    primjeri: tuple[Lokacija, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "parametri", _zamrzni(self.parametri))
@@ -79,7 +81,7 @@ class Nalaz:
         return hash(
             (self.pravilo_id, self.status, self.lokacija, self.poruka_kljuc,
              self.ocekivano, self.pronadeno, self.izvor,
-             tuple(sorted(self.parametri.items())), self.pojave)
+             tuple(sorted(self.parametri.items())), self.pojave, self.primjeri)
         )
 
 

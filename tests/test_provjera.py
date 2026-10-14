@@ -91,6 +91,29 @@ def test_ponavljanja_se_sazimaju(privremena_pravila):
     ]
 
 
+def test_sazimanje_pamti_do_tri_primjera_lokacija(privremena_pravila):
+    privremena_pravila(
+        "R-PONAVLJA",
+        lambda *_: [_nalaz("R-PONAVLJA", Status.NE_PROLAZI, sekcija=s) for s in range(2, 42)]
+        + [_nalaz("R-PONAVLJA", Status.PROSLO)],
+    )
+    izvjestaj = provjeri(_docx(), PROFIL, _kontekst())
+    sazeti, jedini = [n for n in izvjestaj.nalazi if n.pravilo_id == "R-PONAVLJA"]
+    assert sazeti.pojave == 40
+    assert [p.sekcija for p in sazeti.primjeri] == [2, 3, 4]
+    assert sazeti.primjeri[0] == sazeti.lokacija
+    assert (jedini.pojave, jedini.primjeri) == (1, ())
+
+
+def test_ista_lokacija_se_ne_ponavlja_u_primjerima(privremena_pravila):
+    privremena_pravila(
+        "R-PONAVLJA",
+        lambda *_: [_nalaz("R-PONAVLJA", Status.NE_PROLAZI, sekcija=s) for s in (2, 2, 3)],
+    )
+    [nalaz] = [n for n in provjeri(_docx(), PROFIL, _kontekst()).nalazi if n.pravilo_id == "R-PONAVLJA"]
+    assert (nalaz.pojave, [p.sekcija for p in nalaz.primjeri]) == (3, [2, 3])
+
+
 def test_status_pravila_poredak():
     nalazi = (
         _nalaz("R-X", Status.PROSLO),

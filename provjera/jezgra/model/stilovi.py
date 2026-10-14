@@ -299,7 +299,9 @@ class Stilovi:
         if vrsta == "ime":
             return Efektivno(ime, izvor)
         kljuc = "major" if ime.lower().startswith("major") else "minor"
-        return Efektivno(self._fontovi_teme[kljuc], TEMA)
+        # Referenca na temu zadana izravno na runu (npr. „Calibri (Body)“) ostaje ručno
+        # oblikovanje; ime se ipak razrješava iz teme (None ako ga tema ne navodi).
+        return Efektivno(self._fontovi_teme[kljuc], IZRAVNO if izvor == IZRAVNO else TEMA)
 
     def ppr_stila(self, style_id: str | None) -> dict[str, Efektivno]:
         if style_id not in self._ppr_stila:

@@ -93,3 +93,7 @@ ukljuceno = true
 # Stavke literature (odlomci ispod naslova „Literatura“); vlastiti stil je dopušten.
 font = "Calibri"
 velicina = "12 pt"
+
+[pravila.R-STILOVI]
+# Osnovni tekst i naslovi bez ručnog oblikovanja; ciljnih vrijednosti nema.
+ukljuceno = true

@@ -385,6 +385,31 @@ def _literatura_font(dokument, rbr, profil):
     dokument.styles["List Paragraph"].font.name = "Times New Roman"
 
 
+def _stilovi_font(dokument, rbr, profil):
+    """Ispravan font i veličina, ali zadani ručno na runu osnovnog teksta."""
+    tekst = profil.pravila["R-TEKST"]
+    for run in _prvi_osnovni(dokument).runs:
+        run.font.name = tekst.font
+        run.font.size = Pt(tekst.velicina / 2)
+
+
+def _stilovi_poravnanje(dokument, rbr, profil):
+    """Ispravno obostrano poravnanje (jc=both), ali zadano ručno na odlomku."""
+    _prvi_osnovni(dokument).paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+
+def _stilovi_naslov(dokument, rbr, profil):
+    """Ispravan razmak 6 pt, ali zadan ručno na naslovu poglavlja."""
+    naslov = _naslov(dokument, profil, 0)
+    naslov.paragraph_format.space_before = Twips(profil.pravila["R-NASLOVI"].razmak_ispred)
+
+
+def _stilovi_podebljano(dokument, rbr, profil):
+    """Podebljana, nakošena i podcrtana riječ u osnovnom tekstu je dopuštena."""
+    run = _prvi_osnovni(dokument).add_run(" važno")
+    run.bold = run.italic = run.underline = True
+
+
 VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "ispravan": ispravan,
     "jedna_sekcija": lambda rbr, profil: _spremi(_dokument(rbr, profil, jedna_sekcija=True)),
@@ -414,6 +439,10 @@ VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "sazetak_vlastiti_stil": _izmijeni(_sazetak_vlastiti_stil),
     "sazetak_nedostaje": _izmijeni(_sazetak_nedostaje),
     "literatura_font": _izmijeni(_literatura_font),
+    "stilovi_font": _izmijeni(_stilovi_font),
+    "stilovi_poravnanje": _izmijeni(_stilovi_poravnanje),
+    "stilovi_naslov": _izmijeni(_stilovi_naslov),
+    "stilovi_podebljano": _izmijeni(_stilovi_podebljano),
 }
 
 

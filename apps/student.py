@@ -125,6 +125,13 @@ def prikazi_nalaz(nalaz: Nalaz) -> None:
                     st.caption(bez_markdowna(poruka(kljuc, vrijednost=formatiraj(vrijednost.iznos, vrijednost.jedinica))))
         if nalaz.pojave > 1:
             st.caption(poruka("izvjestaj.pojave", pojave=nalaz.pojave))
+            # Jedna lokacija već je u zaglavlju nalaza; „…“ znači da pojava ima više od primjera.
+            lokacije = list(dict.fromkeys(nalaz.primjeri))
+            if len(lokacije) >= 2:
+                primjeri = "; ".join(opis_lokacije(lokacija) for lokacija in lokacije)
+                if nalaz.pojave > len(lokacije):
+                    primjeri += "; …"
+                st.caption(bez_markdowna(poruka("izvjestaj.primjeri", primjeri=primjeri)))
         if nalaz.izvor is not None:
             with st.expander(poruka("izvjestaj.tehnicki_detalji")):
                 st.write(bez_markdowna(poruka("izvjestaj.izvor", izvor=opis_izvora(nalaz.izvor))))

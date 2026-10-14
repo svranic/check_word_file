@@ -233,6 +233,47 @@ def test_redoslijed_grupa_i_status_tekstom(aplikacija):
     assert poruka("izvjestaj.verzija_profila", verzija="abcd1234") in natpisi
 
 
+def test_primjeri_lokacija_uz_broj_pojava(aplikacija):
+    at = _posalji(aplikacija, "54")
+    primjeri = tuple(Lokacija(Dio.TIJELO, sekcija=2, odlomak=i, isjecak=f"Odlomak_{i}") for i in (3, 7, 9))
+    nalaz = Nalaz(
+        "R-NAZIV", Status.NE_PROLAZI, primjeri[0], "R-NAZIV.ne_odgovara_obrascu",
+        ocekivano=Vrijednost("Ime_Prezime_GiG_OG_Vjezba_1.docx", Jedinica.TEKST),
+        pronadeno=Vrijednost("moj_rad.docx", Jedinica.TEKST), pojave=40, primjeri=primjeri,
+    )
+    at.session_state["izvjestaj"] = Izvjestaj(None, (nalaz,), "abcd1234", 54)
+    at = at.run()
+    natpisi = [c.value for c in at.caption]
+    assert poruka("izvjestaj.pojave", pojave=40) in natpisi
+    [redak] = [c for c in natpisi if c.startswith("Primjeri")]
+    tekst = redak.replace("\\", "")
+    assert all(f"odlomak {i}: „Odlomak_{i}…“" in tekst for i in (3, 7, 9))
+    assert tekst.endswith("; …")
+
+
+def _primjeri(at: AppTest, pojave: int, odlomci: tuple[int, ...]) -> list[str]:
+    primjeri = tuple(Lokacija(Dio.TIJELO, sekcija=2, odlomak=i) for i in odlomci)
+    nalaz = Nalaz(
+        "R-NAZIV", Status.NE_PROLAZI, primjeri[0] if primjeri else Lokacija(Dio.NAZIV),
+        "R-NAZIV.ne_odgovara_obrascu",
+        ocekivano=Vrijednost("Ime_Prezime_GiG_OG_Vjezba_1.docx", Jedinica.TEKST),
+        pronadeno=Vrijednost("moj_rad.docx", Jedinica.TEKST), pojave=pojave, primjeri=primjeri,
+    )
+    at.session_state["izvjestaj"] = Izvjestaj(None, (nalaz,), "abcd1234", 54)
+    at = at.run()
+    return [c.value.replace("\\", "") for c in at.caption if c.value.startswith("Primjeri")]
+
+
+def test_svi_primjeri_bez_tri_tocke(aplikacija):
+    [redak] = _primjeri(_posalji(aplikacija, "54"), 2, (3, 7))
+    assert "odlomak 3" in redak and "odlomak 7" in redak and "…" not in redak
+
+
+@pytest.mark.parametrize(("pojave", "odlomci"), [(1, ()), (2, (3,)), (2, (3, 3))])
+def test_manje_od_dva_razlicita_primjera_se_ne_prikazuje(aplikacija, pojave, odlomci):
+    assert not _primjeri(_posalji(aplikacija, "54"), pojave, odlomci)
+
+
 def test_tehnicki_detalji_u_prosirivom_dijelu(aplikacija):
     at = _posalji(aplikacija, "54")
     nalaz = _n(Status.NE_PROLAZI, izvor=Izvor(VrstaIzvora.STIL, "Normal"))

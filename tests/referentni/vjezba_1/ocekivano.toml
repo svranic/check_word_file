@@ -87,3 +87,15 @@ padaju = ["R-SAZETAK"]
 
 [primjeri.literatura_font]
 padaju = ["R-LITERATURA"]
+
+[primjeri.stilovi_font]
+padaju = ["R-STILOVI"]
+
+[primjeri.stilovi_poravnanje]
+padaju = ["R-STILOVI"]
+
+[primjeri.stilovi_naslov]
+padaju = ["R-STILOVI"]
+
+[primjeri.stilovi_podebljano]
+padaju = []
