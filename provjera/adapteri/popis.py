@@ -6,21 +6,28 @@ vrijednosti i vraća studente zajedno s potpunim popisom pogrešaka po retku.
 ``zamrzni``, ``procitaj_zamrznuti``, ``usporedi``, ``primijeni`` i ``spremi``
 upravljaju zamrznutim popisom: Rbr. se nikad ne mijenja, a novi izvoz ne prepisuje
 postojeći popis nego se s njim uspoređuje po JMBAG-u.
+``zapisi_izdano`` i ``procitaj_izdano`` vlasnici su formata ``izdano.json`` (otisak formule
+i verzija profila zapisani pri generiranju PDF-a sa svojstvima).
 Osobni podaci se ne zapisuju u log.
 """
 
 import csv
 import io
+import json
 import logging
 import os
 import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
+from zoneinfo import ZoneInfo
 
 import openpyxl
 
+from provjera.jezgra import formula
+from provjera.jezgra import profil as profil_modul
 from provjera.jezgra import rbr as rbr_unos
 from provjera.jezgra.naziv import nfc
 
@@ -489,3 +496,84 @@ def primijeni(zamrznuti: Sequence[Student], razlike: Razlike) -> tuple[Student, 
         rezultat.append(Student(sljedeci, s.jmbag, s.ime, s.prezime, aktivan=True))
         sljedeci += 1
     return tuple(rezultat)
+
+
+# --- Izdano (priča 3.5) -------------------------------------------------------
+
+DATOTEKA_IZDANO = "izdano.json"
+PREFIKS_PDF = "svojstva_"
+ZONA = ZoneInfo("Europe/Zagreb")
+
+
+class GreskaIzdanog(Exception):
+    """``izdano.json`` postoji, ali nije čitljiv ili ispravan."""
+
+    poruka_kljuc = "popis.izdano_necitljivo"
+
+
+@dataclass(frozen=True)
+class Izdano:
+    formula_otisak: str
+    profil_verzija: str
+    vrijeme: datetime  # s vremenskom zonom Europe/Zagreb
+
+
+def putanja_izdanog(mapa_vjezbe: Path) -> Path:
+    return mapa_vjezbe / DATOTEKA_IZDANO
+
+
+def putanja_pdf(mapa_vjezbe: Path, id_vjezbe: str) -> Path:
+    """``<mapa>/<vjezba>/svojstva_<vjezba.id>.pdf``."""
+    return mapa_vjezbe / f"{PREFIKS_PDF}{id_vjezbe}.pdf"
+
+
+def zapisi_atomski(putanja: Path, sadrzaj: bytes) -> None:
+    """Privremena datoteka u istoj mapi pa ``os.replace``: čitatelj nikad ne vidi pola datoteke."""
+    putanja.parent.mkdir(parents=True, exist_ok=True)
+    opisnik, privremena = tempfile.mkstemp(
+        prefix=f".{putanja.name}.", suffix=".tmp", dir=putanja.parent
+    )
+    try:
+        with os.fdopen(opisnik, "wb") as datoteka:
+            datoteka.write(sadrzaj)
+            datoteka.flush()
+            os.fsync(datoteka.fileno())
+        os.replace(privremena, putanja)
+    finally:
+        Path(privremena).unlink(missing_ok=True)
+
+
+def zapisi_izdano(
+    mapa_vjezbe: Path, profil: profil_modul.Profil, vrijeme: datetime
+) -> Path:
+    """Atomski zapisuje (i prepisuje) ``izdano.json``; ``vrijeme`` mora imati vremensku zonu."""
+    if vrijeme.tzinfo is None or vrijeme.utcoffset() is None:
+        raise ValueError("vrijeme mora imati vremensku zonu")
+    podaci = {
+        "formula_otisak": formula.otisak(profil.formula),
+        "profil_verzija": profil_modul.verzija(profil),
+        "vrijeme": vrijeme.astimezone(ZONA).isoformat(timespec="seconds"),
+    }
+    putanja = putanja_izdanog(mapa_vjezbe)
+    sadrzaj = json.dumps(podaci, ensure_ascii=False, indent=2) + "\n"
+    zapisi_atomski(putanja, sadrzaj.encode("utf-8"))
+    log.info("izdano.json zapisan")
+    return putanja
+
+
+def procitaj_izdano(mapa_vjezbe: Path) -> Izdano | None:
+    """``None`` ako PDF još nije generiran; neispravna datoteka baca ``GreskaIzdanog``."""
+    putanja = putanja_izdanog(mapa_vjezbe)
+    if not putanja.exists():
+        return None
+    try:
+        podaci = json.loads(putanja.read_bytes().decode("utf-8"))
+        otisak, verzija = podaci["formula_otisak"], podaci["profil_verzija"]
+        vrijeme = datetime.fromisoformat(podaci["vrijeme"])
+        if not (isinstance(otisak, str) and otisak and isinstance(verzija, str) and verzija):
+            raise ValueError("otisak i verzija moraju biti neprazan tekst")
+        if vrijeme.tzinfo is None:
+            raise ValueError("vrijeme nema vremensku zonu")
+    except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError) as greska:
+        raise GreskaIzdanog(str(putanja)) from greska
+    return Izdano(otisak, verzija, vrijeme.astimezone(ZONA))

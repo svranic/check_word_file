@@ -2,11 +2,15 @@
 
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
 
+from provjera.adapteri.pdf_svojstva import izradi_pdf, spremi_pdf
 from provjera.adapteri.popis import (
+    ZONA,
+    GreskaIzdanog,
     GreskaRetka,
     GreskaZamrznutog,
     PopisVecZamrznut,
@@ -14,17 +18,22 @@ from provjera.adapteri.popis import (
     Student,
     UcitaniPopis,
     primijeni,
+    procitaj_izdano,
     procitaj_zamrznuti,
+    putanja_izdanog,
+    putanja_pdf,
     putanja_popisa,
     sljedeci_rbr,
     spremi,
     ucitaj_isvu,
     usporedi,
     zamrzni,
+    zapisi_atomski,
+    zapisi_izdano,
 )
 from provjera.adapteri.samoprovjera import GreskaReferentnog, otisak_skupa
 from provjera.adapteri.samoprovjera import pokreni as pokreni_samoprovjeru
-from provjera.jezgra import profil, spremnost
+from provjera.jezgra import formula, profil, spremnost
 from provjera.jezgra.poruke import poruka
 from provjera.jezgra.samoprovjera import (
     NemaSkupa,
@@ -493,6 +502,125 @@ def prikazi_spremnost(
     return rezultat
 
 
+# --- PDF sa svojstvima (priča 3.5) ---------------------------------------------
+
+KLJUC_PDF = "pdf_svojstva"
+FORMAT_VREMENA = "%d.%m.%Y. %H:%M"
+
+
+def _procitaj_ako_postoji(putanja: Path) -> bytes | None:
+    return putanja.read_bytes() if putanja.exists() else None
+
+
+def _vrati(putanja: Path, prije: bytes | None) -> None:
+    """Vraća datoteku na stanje prije generiranja (najbolje što se može)."""
+    try:
+        if prije is None:
+            putanja.unlink(missing_ok=True)
+        else:
+            zapisi_atomski(putanja, prije)
+    except OSError:
+        pass
+
+
+def _neuspjelo(mapa_vjezbe: Path) -> None:
+    st.session_state.get(KLJUC_PDF, {}).pop(str(mapa_vjezbe), None)
+    st.error(poruka("nastavnik.pdf_zapis_neuspio"), icon="❌")
+
+
+def _generiraj_pdf(
+    odabrani: profil.Profil, zamrznuti: tuple[Student, ...], mapa_vjezbe: Path
+) -> None:
+    """Sprema ``izdano.json`` pa PDF, oboje ili ništa; zapamćeni PDF vrijedi za ovaj profil,
+    popis i podatkovnu mapu."""
+    putanja = putanja_pdf(mapa_vjezbe, odabrani.vjezba.id)
+    izdano = putanja_izdanog(mapa_vjezbe)
+    try:
+        sadrzaj = izradi_pdf(odabrani, zamrznuti)
+        izdano_prije = _procitaj_ako_postoji(izdano)
+        zapisi_izdano(mapa_vjezbe, odabrani, datetime.now(ZONA))
+    except OSError:
+        _neuspjelo(mapa_vjezbe)
+        return
+    try:
+        spremi_pdf(sadrzaj, putanja)
+    except OSError:
+        _vrati(izdano, izdano_prije)
+        _neuspjelo(mapa_vjezbe)
+        return
+    spremljeni = st.session_state.setdefault(KLJUC_PDF, {})
+    spremljeni[str(mapa_vjezbe)] = (profil.verzija(odabrani), zamrznuti, sadrzaj)
+    st.success(
+        poruka(
+            "nastavnik.pdf_generirano",
+            putanja=str(putanja),
+            broj=sum(s.aktivan for s in zamrznuti),
+        ),
+        icon="✅",
+    )
+
+
+def prikazi_izdano(odabrani: profil.Profil, mapa_vjezbe: Path) -> None:
+    """Kada je zadnji PDF izdan i odgovara li još trenutnom profilu."""
+    try:
+        izdano = procitaj_izdano(mapa_vjezbe)
+    except GreskaIzdanog as greska:
+        st.error(poruka(greska.poruka_kljuc), icon="❌")
+        return
+    if izdano is None:
+        st.caption(poruka("nastavnik.pdf_nije_izdano"))
+        return
+    st.caption(
+        poruka(
+            "nastavnik.pdf_izdano",
+            vrijeme=izdano.vrijeme.strftime(FORMAT_VREMENA),
+            verzija=izdano.profil_verzija,
+        )
+    )
+    if (izdano.formula_otisak, izdano.profil_verzija) != (
+        formula.otisak(odabrani.formula),
+        profil.verzija(odabrani),
+    ):
+        st.warning(poruka("nastavnik.pdf_izdano_razlika"), icon="⚠️")
+
+
+def prikazi_pdf(
+    odabrani: profil.Profil,
+    zamrznuti: tuple[Student, ...] | None,
+    pregled: spremnost.PregledSpremnosti,
+    mapa_vjezbe: Path,
+) -> None:
+    st.subheader(poruka("nastavnik.pdf_naslov"))
+    st.caption(poruka("nastavnik.pdf_opis"))
+    st.caption(poruka("nastavnik.pdf_poveznica"))
+    st.code(odabrani.vjezba.poveznica, language=None)
+    spremno = pregled.spremno and zamrznuti is not None
+    if not spremno:
+        st.caption(poruka("nastavnik.pdf_onemoguceno"))
+    if st.button(
+        poruka("nastavnik.pdf_generiraj"),
+        key="generiraj_pdf",
+        type="primary",
+        disabled=not spremno,
+        help=None if spremno else poruka("nastavnik.pdf_onemoguceno"),
+    ) and spremno:
+        _generiraj_pdf(odabrani, zamrznuti, mapa_vjezbe)
+    prikazi_izdano(odabrani, mapa_vjezbe)
+    if not spremno:
+        return
+    spremljeno = st.session_state.get(KLJUC_PDF, {}).get(str(mapa_vjezbe))
+    if spremljeno is None or spremljeno[:2] != (profil.verzija(odabrani), zamrznuti):
+        return
+    st.download_button(
+        poruka("nastavnik.pdf_preuzmi"),
+        data=spremljeno[2],
+        file_name=putanja_pdf(mapa_vjezbe, odabrani.vjezba.id).name,
+        mime="application/pdf",
+        key="preuzmi_pdf",
+        on_click="ignore",
+    )
+
+
 st.set_page_config(page_title=poruka("nastavnik.naslov"), page_icon="📋")
 
 st.title(poruka("nastavnik.naslov"))
@@ -502,8 +630,9 @@ vjezba = odabir_vjezbe()
 mapa_vjezbe = mapa / vjezba.vjezba.id
 zamrznuti = zamrznuti_popis(putanja_popisa(mapa_vjezbe))
 samoprovjera = rezultat_samoprovjere(vjezba)
-prikazi_spremnost(vjezba, zamrznuti, samoprovjera)
+pregled_spremnosti = prikazi_spremnost(vjezba, zamrznuti, samoprovjera)
 prikazi_samoprovjeru(vjezba, samoprovjera)
+prikazi_pdf(vjezba, zamrznuti, pregled_spremnosti, mapa_vjezbe)
 
 st.subheader(poruka("nastavnik.popis_naslov"))
 datoteka = st.file_uploader(poruka("nastavnik.ucitaj_popis"), type=["xlsx"], key="isvu")

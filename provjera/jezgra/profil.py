@@ -3,6 +3,7 @@
 import hashlib
 import tomllib
 from collections.abc import Iterable
+from urllib.parse import urlsplit
 
 from pydantic import (
     BaseModel,
@@ -38,6 +39,25 @@ class Vjezba(_Odjeljak):
     id: str = Field(pattern=r"^[a-z0-9_]+$")
     naziv: str = Field(min_length=1)
     objavljeno: bool
+    # Poveznica na web provjeru koja se objavljuje u PDF-u sa svojstvima.
+    poveznica: str
+
+    @field_validator("poveznica")
+    @classmethod
+    def _https(cls, vrijednost: str) -> str:
+        try:
+            dijelovi = urlsplit(vrijednost)
+            dijelovi.port  # neispravan port („:abc“) baca ValueError
+            ispravna = (
+                dijelovi.scheme == "https"
+                and bool(dijelovi.hostname)
+                and not any(z.isspace() for z in vrijednost)
+            )
+        except ValueError:
+            ispravna = False
+        if not ispravna:
+            raise ValueError("poveznica mora biti https adresa, npr. 'https://primjer.hr/'")
+        return vrijednost
 
 
 class NazivDatoteke(_Odjeljak):

@@ -3,8 +3,11 @@
 import csv
 import errno
 import io
+import json
 import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import openpyxl
 import pytest
@@ -23,19 +26,27 @@ from alati.isvu import (
 )
 
 from provjera.adapteri.popis import (
+    GreskaIzdanog,
     GreskaRetka,
     GreskaZamrznutog,
+    Izdano,
     PopisVecZamrznut,
     Razlike,
     Student,
     UcitaniPopis,
     primijeni,
+    procitaj_izdano,
     procitaj_zamrznuti,
+    putanja_izdanog,
+    putanja_pdf,
     spremi,
     ucitaj_isvu,
     usporedi,
     zamrzni,
+    zapisi_izdano,
 )
+from provjera.jezgra import formula as formula_modul
+from provjera.jezgra import profil as profil_modul
 from provjera.jezgra.poruke import KATALOG, poruka
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -556,3 +567,108 @@ def test_log_zamrzavanja_ne_sadrzi_osobne_podatke(tmp_path, caplog):
     for s in procitaj_zamrznuti(putanja):
         for podatak in (s.jmbag, s.ime, s.prezime):
             assert podatak not in caplog.text
+
+
+# --- izdano.json (priča 3.5) --------------------------------------------------
+
+PROFIL_VJEZBE_1 = Path(__file__).resolve().parents[1] / "profili" / "vjezba_1.toml"
+ZAGREB = ZoneInfo("Europe/Zagreb")
+
+
+def _profil(zamjena: tuple[str, str] | None = None) -> profil_modul.Profil:
+    tekst = PROFIL_VJEZBE_1.read_text(encoding="utf-8")
+    if zamjena:
+        tekst = tekst.replace(*zamjena)
+    return profil_modul.ucitaj(tekst.encode("utf-8"))
+
+
+def test_putanje_izdanog_i_pdf(tmp_path):
+    mapa = tmp_path / "vjezba_1"
+    assert putanja_izdanog(mapa) == mapa / "izdano.json"
+    assert putanja_pdf(mapa, "vjezba_1") == mapa / "svojstva_vjezba_1.pdf"
+
+
+def test_zapisi_izdano_otisak_verzija_i_vrijeme(tmp_path):
+    mapa = tmp_path / "vjezba_1"
+    profil = _profil()
+    # Ljetno vrijeme: 10:30 UTC je 12:30 u Zagrebu (+02:00).
+    putanja = zapisi_izdano(mapa, profil, datetime(2026, 7, 1, 10, 30, tzinfo=timezone.utc))
+    assert putanja == mapa / "izdano.json"
+    podaci = json.loads(putanja.read_text(encoding="utf-8"))
+    assert podaci == {
+        "formula_otisak": formula_modul.otisak(profil.formula),
+        "profil_verzija": profil_modul.verzija(profil),
+        "vrijeme": "2026-07-01T12:30:00+02:00",
+    }
+    izdano = procitaj_izdano(mapa)
+    assert izdano == Izdano(
+        formula_modul.otisak(profil.formula),
+        profil_modul.verzija(profil),
+        datetime(2026, 7, 1, 12, 30, tzinfo=ZAGREB),
+    )
+    assert izdano.vrijeme.utcoffset() == timedelta(hours=2)
+
+
+def test_zapisi_izdano_zimsko_vrijeme(tmp_path):
+    zapisi_izdano(tmp_path, _profil(), datetime(2026, 12, 1, 9, 0, tzinfo=ZAGREB))
+    podaci = json.loads(putanja_izdanog(tmp_path).read_text(encoding="utf-8"))
+    assert podaci["vrijeme"] == "2026-12-01T09:00:00+01:00"
+
+
+def test_zapisi_izdano_prepisuje_postojeci(tmp_path):
+    vrijeme = datetime(2026, 10, 14, 12, 0, tzinfo=ZAGREB)
+    zapisi_izdano(tmp_path, _profil(), vrijeme)
+    drugi = _profil(("sjeme = 20261012", "sjeme = 1"))
+    zapisi_izdano(tmp_path, drugi, vrijeme + timedelta(hours=1))
+    izdano = procitaj_izdano(tmp_path)
+    assert izdano.formula_otisak == formula_modul.otisak(drugi.formula)
+    assert izdano.profil_verzija == profil_modul.verzija(drugi)
+    assert izdano.vrijeme == vrijeme + timedelta(hours=1)
+    assert [p.name for p in tmp_path.iterdir()] == ["izdano.json"]
+
+
+def test_zapisi_izdano_bez_vremenske_zone_baca(tmp_path):
+    with pytest.raises(ValueError):
+        zapisi_izdano(tmp_path, _profil(), datetime(2026, 10, 14, 12, 0))
+    assert not putanja_izdanog(tmp_path).exists()
+
+
+def test_neuspjelo_pisanje_izdanog_ne_mijenja_postojeci(tmp_path, monkeypatch):
+    import provjera.adapteri.popis as modul
+
+    zapisi_izdano(tmp_path, _profil(), datetime(2026, 10, 14, 12, 0, tzinfo=ZAGREB))
+    prije = putanja_izdanog(tmp_path).read_bytes()
+
+    def pukni(*_args):
+        raise OSError("disk pun")
+
+    monkeypatch.setattr(modul.os, "replace", pukni)
+    with pytest.raises(OSError):
+        zapisi_izdano(tmp_path, _profil(), datetime(2026, 10, 15, 12, 0, tzinfo=ZAGREB))
+    assert putanja_izdanog(tmp_path).read_bytes() == prije
+    assert [p.name for p in tmp_path.iterdir()] == ["izdano.json"]
+
+
+def test_procitaj_izdano_bez_datoteke(tmp_path):
+    assert procitaj_izdano(tmp_path) is None
+
+
+@pytest.mark.parametrize(
+    "sadrzaj",
+    [
+        b"{",
+        b"[]",
+        b"\xff\xfe",
+        b'{"formula_otisak": "abc", "profil_verzija": "def"}',
+        b'{"formula_otisak": "abc", "profil_verzija": "def", "vrijeme": "2026-10-14T12:00:00"}',
+        b'{"formula_otisak": "", "profil_verzija": "def", "vrijeme": "2026-10-14T12:00:00+02:00"}',
+        b'{"formula_otisak": 1, "profil_verzija": "def", "vrijeme": "2026-10-14T12:00:00+02:00"}',
+        b'{"formula_otisak": "abc", "profil_verzija": "def", "vrijeme": 5}',
+        b'{"formula_otisak": "abc", "profil_verzija": "def", "vrijeme": "jucer"}',
+    ],
+)
+def test_procitaj_izdano_neispravno(tmp_path, sadrzaj):
+    putanja_izdanog(tmp_path).write_bytes(sadrzaj)
+    with pytest.raises(GreskaIzdanog) as greska:
+        procitaj_izdano(tmp_path)
+    assert greska.value.poruka_kljuc in KATALOG

@@ -5,6 +5,9 @@
 id = "vjezba_1"
 naziv = "Vježba 1"
 objavljeno = true
+# Adresa web provjere za studente (objavljuje se u PDF-u sa svojstvima); obavezna, https.
+# Privremena adresa: nastavnik je zamjenjuje stvarnom adresom aplikacije prije objave.
+poveznica = "https://provjera-word.streamlit.app/"
 
 [naziv_datoteke]
 sufiks = "_GiG_OG_Vjezba_1"

@@ -5,7 +5,7 @@ a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefik
 ``app.``, ``nastavnik.``, ``popis.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
 ``margine.``, ``naziv.``, ``ulaz.``, ``opce.``, ``status.``, ``izvjestaj.``,
 ``lokacija.``, ``izvor.``, ``sazetak.``, ``poravnanje.``, ``prored.``, ``spremnost.``,
-``samoprovjera.`` i ``vrijednost.``.
+``samoprovjera.``, ``pdf.`` i ``vrijednost.``.
 """
 
 from collections.abc import Mapping
@@ -221,6 +221,101 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         ),
         "samoprovjera.mapa_necitljiva": "Mapa referentnog skupa {mapa} nije čitljiva.",
         "samoprovjera.u_tijeku": "Samoprovjera je u tijeku …",
+        "pdf.naslov": "{naziv} – svojstva za oblikovanje rada",
+        "pdf.verzija": "Verzija profila: {verzija}",
+        "pdf.poveznica": "Web provjera rada: {poveznica}",
+        "pdf.uputa": (
+            "Pronađi svoj redak u tablici. Datoteku nazovi točno kao u stupcu „Naziv datoteke“, "
+            "a sekcijama rada nakon naslovnice postavi svoje margine. Prije predaje provjeri rad "
+            "na web provjeri: upiši svoj Rbr. i usporedi margine koje ondje vidiš s ovom tablicom."
+        ),
+        "pdf.privatnost": "Napomena o obradi: {obrada}",
+        "pdf.zajednicki_naslov": "Zajednički zahtjevi (isti za sve studente)",
+        "pdf.zahtjev": "{naziv}: {svojstva}.",
+        "pdf.razdjelnik": ", ",
+        "pdf.naslovnica": "Margine naslovnice",
+        "pdf.opis.naslovnica": (
+            "{naslovnica} sa svih strana "
+            "(individualne margine iz tablice vrijede za sekcije rada nakon naslovnice)"
+        ),
+        "pdf.opis.R-NAZIV": (
+            "{obrazac}, s imenom i prezimenom kako su zapisani u ISVU-u "
+            "(tvoj točan naziv je u tablici)"
+        ),
+        "pdf.opis.R-SEKCIJE": (
+            "naslovnica je zasebna sekcija, a rad se nastavlja novom sekcijom na novoj stranici "
+            "(Izgled (Layout) → Prijelomi (Breaks) → Sljedeća stranica (Next Page))"
+        ),
+        "pdf.opis.R-PROMJENE": (
+            "prije predaje prihvati sve praćene promjene (Pregled (Review) → Prihvati (Accept) "
+            "→ Prihvati sve promjene (Accept All Changes)) i isključi praćenje"
+        ),
+        "pdf.opis.R-OKVIRI": (
+            "naslovi i osnovni tekst ne smiju biti u tekstnim okvirima ni oblicima"
+        ),
+        "pdf.opis.R-BROJ-STRANICE": (
+            "Wordovo polje broja stranice u podnožju svake sekcije rada, naslovnica nema broj"
+        ),
+        "pdf.opis.R-STILOVI": (
+            "osnovni tekst i naslovi oblikuju se stilovima, bez ručnog oblikovanja"
+        ),
+        "pdf.oznaka": "{prvi}, {drugi} …",
+        "pdf.svojstvo.stil": "stil {vrijednost}",
+        "pdf.svojstvo.font": "font {vrijednost}",
+        "pdf.svojstvo.velicina": "veličina {vrijednost}",
+        "pdf.svojstvo.podebljano": "podebljano: {vrijednost}",
+        "pdf.svojstvo.poravnanje": "poravnanje {vrijednost}",
+        "pdf.svojstvo.razmak_ispred": "razmak ispred {vrijednost}",
+        "pdf.svojstvo.razmak_iza": "razmak iza {vrijednost}",
+        "pdf.svojstvo.prored": "prored {vrijednost}",
+        "pdf.svojstvo.oznaka": "Wordova numeracija {vrijednost}",
+        "pdf.svojstvo.uvlaka_lijevo": "uvlaka lijevo {vrijednost}",
+        "pdf.svojstvo.uvlaka_desno": "uvlaka desno {vrijednost}",
+        "pdf.tablica_naslov": "Individualna svojstva studenata",
+        "pdf.tablica_opis": "Margine vrijede za sve sekcije rada nakon naslovnice.",
+        "pdf.stupac_rbr": "Rbr.",
+        "pdf.stupac_ime": "Ime",
+        "pdf.stupac_prezime": "Prezime",
+        "pdf.stupac_naziv": "Naziv datoteke",
+        "pdf.stupac_gore": "Gore",
+        "pdf.stupac_dolje": "Dolje",
+        "pdf.stupac_lijevo": "Lijevo",
+        "pdf.stupac_desno": "Desno",
+        "pdf.stranica": "Stranica {broj} od {ukupno}",
+        "nastavnik.pdf_naslov": "PDF sa svojstvima",
+        "nastavnik.pdf_opis": (
+            "PDF za objavu u e-učenju: Rbr., ime, prezime, očekivani naziv datoteke i margine "
+            "svakog aktivnog studenta te zajednički zahtjevi. Ne sadrži JMBAG-ove."
+        ),
+        "nastavnik.pdf_generiraj": "Generiraj PDF",
+        "nastavnik.pdf_onemoguceno": (
+            "PDF se može generirati tek kad je vježba spremna (vidi odjeljak Spremnost)."
+        ),
+        "nastavnik.pdf_generirano": (
+            "PDF je generiran ({putanja}). Otisak formule i verzija profila zapisani su u "
+            "izdano.json. Broj studenata u PDF-u: {broj}."
+        ),
+        "nastavnik.pdf_zapis_neuspio": (
+            "PDF nije zapisan. Zatvori PDF ili izdano.json ako je otvoren u drugom programu "
+            "i provjeri može li se pisati u podatkovnu mapu, pa pokušaj ponovno."
+        ),
+        "nastavnik.pdf_preuzmi": "Preuzmi PDF",
+        "nastavnik.pdf_poveznica": (
+            "Poveznica na web provjeru koja će biti u PDF-u. Provjeri je prije generiranja; "
+            "mijenja se u profilu vježbe ([vjezba] poveznica):"
+        ),
+        "nastavnik.pdf_izdano": (
+            "Zadnji PDF izdan je {vrijeme} (verzija profila {verzija})."
+        ),
+        "nastavnik.pdf_izdano_razlika": (
+            "Profil ili formula margina promijenili su se od zadnjeg izdanog PDF-a. Studenti "
+            "već imaju raniji PDF: novi PDF mijenja njihova svojstva i treba ga ponovno objaviti."
+        ),
+        "nastavnik.pdf_nije_izdano": "PDF za ovu vježbu još nije izdan.",
+        "popis.izdano_necitljivo": (
+            "Datoteka izdano.json nije ispravna (potrebni su formula_otisak, profil_verzija "
+            "i vrijeme u ISO 8601 s vremenskom zonom)."
+        ),
         "profil.dupli_id": "vjezba.id: isti id već ima profil {datoteka}",
         "profil.necitljiv": "datoteka: nije čitljiva ({razlog})",
         "profil.nedostupno": (

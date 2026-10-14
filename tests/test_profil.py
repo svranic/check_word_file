@@ -31,7 +31,8 @@ def test_verzija_ne_ovisi_o_redoslijedu_ni_komentarima():
         "raspon = \"0,5 cm\"\nosnovica_desno = \"2,5 cm\"\nosnovica_lijevo = \"3 cm\"\n"
         "osnovica_dolje = \"2,5 cm\"\nosnovica_gore = \"2,5 cm\"\n"
         "[naziv_datoteke]\nnastavak = \".docx\"\nsufiks = \"_GiG_OG_Vjezba_1\"\n"
-        "[vjezba]\nobjavljeno = true\nnaziv = \"Vježba 1\"\nid = \"vjezba_1\"\n"
+        "[vjezba]\npoveznica = \"https://provjera-word.streamlit.app/\"\n"
+        "objavljeno = true\nnaziv = \"Vježba 1\"\nid = \"vjezba_1\"\n"
         "[pravila.R-TEKST]\nprored = \"1\"\nrazmak_iza = \"6 pt\"\nrazmak_ispred = \"6 pt\"\n"
         "poravnanje = \"obostrano\"\nvelicina = \"12 pt\"\nfont = \"Calibri\"\nstil = \"Normal\"\n"
         "[pravila.R-NASLOVI]\noznaka = \"{n}.\"\nrazmak_iza = \"6 pt\"\nrazmak_ispred = \"6 pt\"\n"
@@ -149,3 +150,43 @@ def test_iskljucen_r_tekst_ne_treba_ciljne_vrijednosti():
 def test_poravnanje_ostalo_nije_dopusteno_u_profilu():
     with pytest.raises(profil.GreskaProfila):
         profil.ucitaj(_vjezba_1().replace('poravnanje = "obostrano"', 'poravnanje = "ostalo"').encode("utf-8"))
+
+
+def test_bez_poveznice_greska_kljuca_vjezba_poveznica():
+    tekst = "\n".join(
+        r for r in _vjezba_1().splitlines() if not r.startswith("poveznica =")
+    )
+    with pytest.raises(profil.GreskaProfila) as greska:
+        profil.ucitaj(tekst.encode("utf-8"))
+    assert len(greska.value.greske) == 1
+    assert greska.value.greske[0].startswith("vjezba.poveznica:")
+
+
+@pytest.mark.parametrize(
+    "poveznica",
+    [
+        "http://provjera.primjer.hr/",
+        "provjera.primjer.hr",
+        "https://",
+        "https:///put",
+        "https://primjer.hr/ razmak",
+        " https://primjer.hr/",
+        "ftp://primjer.hr/",
+        "https://[neispravno",
+        "https://primjer.hr:abc/",
+        "https://primjer.hr:99999/",
+        "",
+    ],
+)
+def test_poveznica_mora_biti_https(poveznica):
+    tekst = _vjezba_1().replace(
+        'poveznica = "https://provjera-word.streamlit.app/"', f'poveznica = "{poveznica}"'
+    )
+    with pytest.raises(profil.GreskaProfila) as greska:
+        profil.ucitaj(tekst.encode("utf-8"))
+    assert [g.split(":")[0] for g in greska.value.greske] == ["vjezba.poveznica"]
+
+
+def test_poveznica_vjezbe_1():
+    p = profil.ucitaj(PROFIL_VJEZBE_1.read_bytes())
+    assert p.vjezba.poveznica.startswith("https://")

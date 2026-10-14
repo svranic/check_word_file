@@ -1,7 +1,10 @@
 """Nastavnička aplikacija (priča 3.1): podatkovna mapa, odabir vježbe, učitavanje ISVU popisa."""
 
+import io
+import json
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -15,10 +18,21 @@ from alati.isvu import (
     UPISAN,
     izvoz,
 )
+from pypdf import PdfReader
 from streamlit.testing.v1 import AppTest
 
+from provjera.adapteri import pdf_svojstva
 from provjera.adapteri import popis as popis_modul
-from provjera.adapteri.popis import Student, procitaj_zamrznuti, spremi, ucitaj_isvu, zamrzni
+from provjera.adapteri.popis import (
+    ZONA,
+    Student,
+    procitaj_izdano,
+    procitaj_zamrznuti,
+    spremi,
+    ucitaj_isvu,
+    zamrzni,
+    zapisi_izdano,
+)
 from provjera.jezgra import formula, profil
 from provjera.jezgra.poruke import poruka
 
@@ -804,3 +818,197 @@ def test_promjena_referentnog_skupa_ponistava_samoprovjeru(tmp_path, monkeypatch
     assert poruka("samoprovjera.prolazi") not in [s.value for s in at.success]
     assert not at.dataframe
     assert "- " + poruka("spremnost.samoprovjera_nije_pokrenuta") in _tekst(at)
+
+
+# --- PDF sa svojstvima (priča 3.5) --------------------------------------------
+
+
+def _popis_za_pdf() -> tuple[Student, ...]:
+    """Rbr. 1–5, Rbr. 3 je ispisan."""
+    return tuple(
+        Student(rbr=r, jmbag=f"{9900000000 + r}", ime="Đurđa", prezime=f"Šćekić{r}", aktivan=r != 3)
+        for r in range(1, 6)
+    )
+
+
+def _mapa_vjezbe(podaci: Path) -> Path:
+    return podaci / "vjezba_1"
+
+
+def test_pdf_nije_spremno_gumb_onemogucen(podaci, aplikacija):
+    spremi(_popis_za_pdf(), _popis_csv(podaci))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    assert not at.exception
+    assert poruka("nastavnik.pdf_naslov") in [s.value for s in at.subheader]
+    gumb = at.button(key="generiraj_pdf")
+    assert gumb.label == poruka("nastavnik.pdf_generiraj") == "Generiraj PDF"
+    assert gumb.disabled
+    assert poruka("nastavnik.pdf_onemoguceno") in [c.value for c in at.caption]
+    mapa = _mapa_vjezbe(podaci)
+    assert not (mapa / "svojstva_vjezba_1.pdf").exists()
+    assert not (mapa / "izdano.json").exists()
+    assert not at.get("download_button")
+
+
+def test_pdf_bez_popisa_gumb_onemogucen(u_mapi, podaci):
+    gumb = u_mapi.button(key="generiraj_pdf")
+    assert gumb.disabled
+    assert not _mapa_vjezbe(podaci).exists()
+
+
+def test_pdf_spremno_generira_pdf_i_izdano(podaci, aplikacija):
+    spremi(_popis_za_pdf(), _popis_csv(podaci))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    at = _samoprovjera(at)
+    assert [s.value for s in at.success if s.value == poruka("spremnost.spremno")]
+    gumb = at.button(key="generiraj_pdf")
+    assert not gumb.disabled
+    assert poruka("nastavnik.pdf_onemoguceno") not in [c.value for c in at.caption]
+    at = gumb.click().run()
+    assert not at.exception
+    assert not at.error
+
+    mapa = _mapa_vjezbe(podaci)
+    pdf = mapa / "svojstva_vjezba_1.pdf"
+    assert pdf.exists()
+    putanja_poruka = poruka("nastavnik.pdf_generirano", putanja=str(pdf), broj=4)
+    assert putanja_poruka in [s.value for s in at.success]
+
+    vjezba = profil.ucitaj(VJEZBA_1.read_bytes())
+    izdano = procitaj_izdano(mapa)
+    assert izdano.formula_otisak == formula.otisak(vjezba.formula)
+    assert izdano.profil_verzija == profil.verzija(vjezba)
+    assert izdano.vrijeme.utcoffset() is not None
+    podaci_izdano = json.loads((mapa / "izdano.json").read_text(encoding="utf-8"))
+    assert set(podaci_izdano) == {"formula_otisak", "profil_verzija", "vrijeme"}
+
+    tekst = "\n".join(s.extract_text() for s in PdfReader(io.BytesIO(pdf.read_bytes())).pages)
+    for s in _popis_za_pdf():
+        assert s.jmbag not in tekst
+        assert (s.prezime in tekst) == s.aktivan
+    assert "Đurđa" in tekst
+
+    [preuzmi] = at.get("download_button")
+    assert preuzmi.proto.label == poruka("nastavnik.pdf_preuzmi")
+
+    # Gumb za preuzimanje ostaje i nakon druge interakcije sa stranicom.
+    at = at.run()
+    assert at.get("download_button")
+
+
+def test_pdf_neuspjelo_pisanje_prikazuje_poruku(podaci, aplikacija, monkeypatch):
+    spremi(_popis_za_pdf(), _popis_csv(podaci))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    at = _samoprovjera(at)
+
+    def pukni(*_args):
+        raise OSError("disk pun")
+
+    monkeypatch.setattr(pdf_svojstva, "zapisi_atomski", pukni)
+    at = at.button(key="generiraj_pdf").click().run()
+    assert not at.exception
+    assert [e.value for e in at.error] == [poruka("nastavnik.pdf_zapis_neuspio")]
+    assert not (_mapa_vjezbe(podaci) / "izdano.json").exists()
+    assert not at.get("download_button")
+
+
+def _generiran_pdf(podaci: Path, aplikacija: AppTest) -> AppTest:
+    spremi(_popis_za_pdf(), _popis_csv(podaci))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    at = _samoprovjera(at)
+    at = at.button(key="generiraj_pdf").click().run()
+    assert not at.exception
+    assert at.get("download_button")
+    return at
+
+
+def test_pdf_neuspjelo_pisanje_izdanog_cuva_prethodni_par(podaci, aplikacija, monkeypatch):
+    at = _generiran_pdf(podaci, aplikacija)
+    mapa = _mapa_vjezbe(podaci)
+    pdf_prije = (mapa / "svojstva_vjezba_1.pdf").read_bytes()
+    izdano_prije = (mapa / "izdano.json").read_bytes()
+
+    def pukni(*_args):
+        raise OSError("disk pun")
+
+    monkeypatch.setattr(popis_modul, "zapisi_atomski", pukni)
+    at = at.button(key="generiraj_pdf").click().run()
+    assert not at.exception
+    assert [e.value for e in at.error] == [poruka("nastavnik.pdf_zapis_neuspio")]
+    assert (mapa / "svojstva_vjezba_1.pdf").read_bytes() == pdf_prije
+    assert (mapa / "izdano.json").read_bytes() == izdano_prije
+    assert not at.get("download_button")
+
+
+def test_pdf_neuspjelo_pisanje_pdf_vraca_prethodni_izdano(podaci, aplikacija, monkeypatch):
+    at = _generiran_pdf(podaci, aplikacija)
+    mapa = _mapa_vjezbe(podaci)
+    pdf_prije = (mapa / "svojstva_vjezba_1.pdf").read_bytes()
+    izdano_prije = (mapa / "izdano.json").read_bytes()
+
+    def pukni(*_args):
+        raise OSError("disk pun")
+
+    monkeypatch.setattr(pdf_svojstva, "zapisi_atomski", pukni)
+    at = at.button(key="generiraj_pdf").click().run()
+    assert [e.value for e in at.error] == [poruka("nastavnik.pdf_zapis_neuspio")]
+    assert (mapa / "svojstva_vjezba_1.pdf").read_bytes() == pdf_prije
+    assert (mapa / "izdano.json").read_bytes() == izdano_prije
+    assert not at.get("download_button")
+
+
+def test_pdf_promjena_popisa_skriva_preuzimanje(podaci, aplikacija):
+    at = _generiran_pdf(podaci, aplikacija)
+    spremi(_popis_za_pdf()[:4], _popis_csv(podaci))
+    at = at.run()
+    assert not at.exception
+    assert not at.get("download_button")
+
+
+def test_pdf_druga_podatkovna_mapa_skriva_preuzimanje(podaci, aplikacija, tmp_path):
+    at = _generiran_pdf(podaci, aplikacija)
+    druga = tmp_path / "Druga"
+    spremi(_popis_za_pdf(), _popis_csv(druga))
+    at = at.text_input(key="podatkovna_mapa").input(str(druga)).run()
+    assert not at.exception
+    assert not at.button(key="generiraj_pdf").disabled
+    assert not at.get("download_button")
+
+
+def test_pdf_prikazuje_poveznicu(u_mapi):
+    vjezba = profil.ucitaj(VJEZBA_1.read_bytes())
+    assert vjezba.vjezba.poveznica in [c.value for c in u_mapi.code]
+    assert poruka("nastavnik.pdf_poveznica") in [c.value for c in u_mapi.caption]
+
+
+def test_pdf_prikazuje_zadnje_izdano(podaci, aplikacija):
+    at = _generiran_pdf(podaci, aplikacija)
+    izdano = procitaj_izdano(_mapa_vjezbe(podaci))
+    ocekivano = poruka(
+        "nastavnik.pdf_izdano",
+        vrijeme=izdano.vrijeme.strftime("%d.%m.%Y. %H:%M"),
+        verzija=izdano.profil_verzija,
+    )
+    assert ocekivano in [c.value for c in at.caption]
+    assert poruka("nastavnik.pdf_izdano_razlika") not in [w.value for w in at.warning]
+
+
+def test_pdf_izdano_za_drugi_profil_upozorava(podaci, aplikacija):
+    drugi = profil.ucitaj(
+        _zamijeni(VJEZBA_1.read_bytes(), b"sjeme = 20261012", b"sjeme = 1")
+    )
+    zapisi_izdano(_mapa_vjezbe(podaci), drugi, datetime(2026, 10, 1, 9, 5, tzinfo=ZONA))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    assert not at.exception
+    assert poruka("nastavnik.pdf_izdano_razlika") in [w.value for w in at.warning]
+    assert poruka(
+        "nastavnik.pdf_izdano", vrijeme="01.10.2026. 09:05", verzija=profil.verzija(drugi)
+    ) in [c.value for c in at.caption]
+
+
+def test_pdf_ostecen_izdano_prikazuje_gresku(podaci, aplikacija):
+    _mapa_vjezbe(podaci).mkdir(parents=True)
+    (_mapa_vjezbe(podaci) / "izdano.json").write_bytes(b"{")
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    assert not at.exception
+    assert [e.value for e in at.error] == [poruka("popis.izdano_necitljivo")]
