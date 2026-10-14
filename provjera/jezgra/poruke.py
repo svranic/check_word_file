@@ -93,6 +93,71 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "popis.jmbag_neispravan": "JMBAG mora imati točno 10 znamenki.",
         "popis.prazno_ime": "Ime je prazno.",
         "popis.prazno_prezime": "Prezime je prazno.",
+        "popis.zamrznuti_necitljiv": "Zamrznuti popis nije čitljiva CSV datoteka u UTF-8.",
+        "popis.zamrznuti_prazan": "Zamrznuti popis ne sadrži nijednog studenta.",
+        "popis.zamrznuti_zaglavlje": "Zaglavlje mora biti točno: {stupci}.",
+        "popis.zamrznuti_broj_stupaca": "Redak ima {pronadeno} stupaca umjesto {ocekivano}.",
+        "popis.zamrznuti_aktivan": "Stupac aktivan mora biti true ili false.",
+        "nastavnik.zamrznuti_naslov": "Zamrznuti popis za vježbu",
+        "nastavnik.zamrznuti_nema": (
+            "Popis za ovu vježbu još nije zamrznut. Učitaj ispravan ISVU izvoz i zamrzni ga."
+        ),
+        "nastavnik.zamrznuti_stanje": (
+            "Zamrznuti popis – broj studenata: {broj}, aktivnih: {aktivnih}, "
+            "neaktivnih: {neaktivnih}."
+        ),
+        "nastavnik.zamrznuti_ne_uredivati": (
+            "Ne otvaraj i ne spremaj popis.csv u Excelu: spremanje mijenja razdjelnik i briše "
+            "vodeće nule JMBAG-a, pa popis postaje neispravan."
+        ),
+        "nastavnik.zamrznuti_ostecen": (
+            "Zamrznuti popis ({putanja}) je oštećen: {poruka} Ispravi ili ukloni datoteku; "
+            "aplikacija je ne prepisuje."
+        ),
+        "nastavnik.zamrzni": "Zamrzni popis",
+        "nastavnik.zamrzni_pomoc": (
+            "Rbr. iz popisa određuje margine studenata i nakon zamrzavanja se više ne mijenja."
+        ),
+        "nastavnik.zamrzni_onemoguceno": "Popis s greškama ne može se zamrznuti.",
+        "nastavnik.zamrznuto": "Popis je zamrznut. Broj studenata: {broj}.",
+        "nastavnik.vec_zamrznut": (
+            "Popis za ovu vježbu već je zamrznut i ne prepisuje se novim izvozom."
+        ),
+        "nastavnik.zapis_neuspio": (
+            "Popis nije zapisan. Zatvori popis.csv ako je otvoren u drugom programu "
+            "(npr. Excelu) i provjeri može li se pisati u podatkovnu mapu, pa pokušaj ponovno."
+        ),
+        "nastavnik.popis_neispravan_za_zapis": (
+            "Popis nije zapisan jer nije ispravan (prazan ili s ponovljenim Rbr. ili JMBAG-om)."
+        ),
+        "nastavnik.popis_promijenjen": (
+            "Zamrznuti popis se u međuvremenu promijenio, pa promjene nisu primijenjene. "
+            "Osvježi stranicu i ponovno pregledaj razlike."
+        ),
+        "nastavnik.razlike_naslov": "Razlike novog izvoza i zamrznutog popisa (po JMBAG-u)",
+        "nastavnik.razlike_nema": "Nema razlika: zamrznuti popis je ažuran.",
+        "nastavnik.razlike_nema_za_primjenu": (
+            "Nema promjena za primijeniti; razlike u imenima samo su upozorenje."
+        ),
+        "nastavnik.razlike_novi": "Novi studenti (kasni upis):",
+        "nastavnik.razlike_novi_student": "{ime} {prezime} (JMBAG {jmbag}) dobiva Rbr. {rbr}",
+        "nastavnik.razlike_ispisani": "Ispisani studenti (zadržavaju Rbr., postaju neaktivni):",
+        "nastavnik.razlike_ponovno": "Ponovno upisani studenti (ponovno postaju aktivni):",
+        "nastavnik.razlike_student": "Rbr. {rbr}: {ime} {prezime} (JMBAG {jmbag})",
+        "nastavnik.razlike_imena": (
+            "Promijenjeno ime u ISVU-u (samo upozorenje, zamrznuti popis se ne mijenja):"
+        ),
+        "nastavnik.razlike_ime": (
+            "Rbr. {rbr}: {staro} → {novo} (JMBAG {jmbag})"
+        ),
+        "nastavnik.primijeni": "Primijeni promjene",
+        "nastavnik.primijeni_onemoguceno": (
+            "Promjene se ne mogu primijeniti dok novi izvoz ima grešaka."
+        ),
+        "nastavnik.primijenjeno": (
+            "Promjene su primijenjene – novi studenti: {novi}, ispisani: {ispisani}, "
+            "ponovno upisani: {ponovno}."
+        ),
         "profil.nedostupno": (
             "Provjera trenutno nije dostupna. Pokušaj kasnije ili se javi nastavniku."
         ),

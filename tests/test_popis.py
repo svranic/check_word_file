@@ -1,14 +1,41 @@
 """ISVU popis studenata (priča 3.1): adapter ``provjera.adapteri.popis``."""
 
+import csv
+import errno
 import io
 import logging
 from pathlib import Path
 
 import openpyxl
 import pytest
-from alati.isvu import ISPISAN, ISPRAVNI, S_GRESKAMA, UPISAN, ZAGLAVLJE, fixturei, izvoz
+from alati.isvu import (
+    ISPIS,
+    ISPISAN,
+    ISPRAVNI,
+    KASNI_UPIS,
+    PONOVNI_UPIS,
+    PRENUMERIRANI,
+    S_GRESKAMA,
+    UPISAN,
+    ZAGLAVLJE,
+    fixturei,
+    izvoz,
+)
 
-from provjera.adapteri.popis import GreskaRetka, Student, UcitaniPopis, ucitaj_isvu
+from provjera.adapteri.popis import (
+    GreskaRetka,
+    GreskaZamrznutog,
+    PopisVecZamrznut,
+    Razlike,
+    Student,
+    UcitaniPopis,
+    primijeni,
+    procitaj_zamrznuti,
+    spremi,
+    ucitaj_isvu,
+    usporedi,
+    zamrzni,
+)
 from provjera.jezgra.poruke import KATALOG, poruka
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -231,3 +258,301 @@ def test_parametri_greske_su_nepromjenjivi():
     assert greska.parametri["rbr"] == 5
     with pytest.raises(TypeError):
         greska.parametri["rbr"] = 7  # type: ignore[index]
+
+
+# --- Zamrznuti popis (priča 3.2) ----------------------------------------------
+
+
+def _studenti(retci) -> tuple[Student, ...]:
+    popis = ucitaj_isvu(izvoz(retci))
+    assert popis.moze_zamrznuti
+    return popis.studenti
+
+
+def _zamrznuto(tmp_path: Path, retci=ISPRAVNI) -> tuple[Path, tuple[Student, ...]]:
+    putanja = zamrzni(_studenti(retci), tmp_path / "vjezba_1")
+    return putanja, procitaj_zamrznuti(putanja)
+
+
+def test_prvo_zamrzavanje_zapisuje_bom_stupce_i_redoslijed(tmp_path):
+    mapa_vjezbe = tmp_path / "nova" / "vjezba_1"  # mapa se stvara po potrebi
+    putanja = zamrzni(_studenti(ISPRAVNI), mapa_vjezbe)
+    assert putanja == mapa_vjezbe / "popis.csv"
+    sadrzaj = putanja.read_bytes()
+    assert sadrzaj.startswith(b"\xef\xbb\xbf")
+    retci = sadrzaj.decode("utf-8-sig").splitlines()
+    assert retci[0] == "rbr,jmbag,ime,prezime,aktivan"
+    assert retci[1] == "1,0036123456,Ana Marija,Horvat-Kovač,true"
+    assert retci[3] == "3,0036000003,Ivana,Žužić,false"
+    assert len(retci) == 1 + len(ISPRAVNI)
+    assert [p.name for p in mapa_vjezbe.iterdir()] == ["popis.csv"]  # bez privremenih datoteka
+
+
+def test_kruzni_put(tmp_path):
+    studenti = _studenti(ISPRAVNI)
+    putanja = zamrzni(studenti, tmp_path)
+    assert procitaj_zamrznuti(putanja) == studenti
+    assert usporedi(procitaj_zamrznuti(putanja), studenti) == Razlike()
+
+
+def test_postojeci_popis_se_ne_prepisuje(tmp_path):
+    putanja, _ = _zamrznuto(tmp_path)
+    prije = putanja.read_bytes()
+    with pytest.raises(PopisVecZamrznut):
+        zamrzni(_studenti(KASNI_UPIS), putanja.parent)
+    assert putanja.read_bytes() == prije
+
+
+def test_zamrzavanje_ne_prihvaca_neispravan_popis(tmp_path):
+    with pytest.raises(ValueError):
+        zamrzni((), tmp_path)
+    dupli = (Student(1, "0036000001", "Ana", "Horvat", True),) * 2
+    with pytest.raises(ValueError):
+        zamrzni(dupli, tmp_path)
+    assert not (tmp_path / "popis.csv").exists()
+
+
+def test_novi_izvoz_bez_promjena_nema_razlika_i_ne_mijenja_datoteku(tmp_path):
+    putanja, zamrznuti = _zamrznuto(tmp_path)
+    prije = putanja.read_bytes()
+    razlike = usporedi(zamrznuti, _studenti(ISPRAVNI))
+    assert razlike == Razlike()
+    assert not razlike.ima_promjena
+    assert putanja.read_bytes() == prije
+
+
+def test_prenumeriran_izvoz_nema_razlika(tmp_path):
+    _, zamrznuti = _zamrznuto(tmp_path)
+    izvoz_ = _studenti(PRENUMERIRANI)
+    po_jmbagu = {s.jmbag: s.rbr for s in zamrznuti}
+    assert any(po_jmbagu[s.jmbag] != s.rbr for s in izvoz_)  # ISVU je prenumerirao
+    assert usporedi(zamrznuti, izvoz_) == Razlike()
+
+
+def test_kasni_upis_dobiva_max_rbr_plus_1():
+    zamrznuti = tuple(
+        Student(rbr, f"00360000{rbr:02d}", "Ime", f"Prezime{rbr}", True) for rbr in (1, 5, 78)
+    )
+    izvoz_ = (
+        Student(1, "0036000099", "Marta", "Babić", True),  # ISVU Rbr. se zanemaruje
+        *(Student(i + 2, s.jmbag, s.ime, s.prezime, True) for i, s in enumerate(zamrznuti)),
+        Student(9, "0036000098", "Nera", "Zec", True),
+        Student(10, "0036000097", "Iva", "Ispisana", False),  # nije aktivna, pa nije nova
+    )
+    razlike = usporedi(zamrznuti, izvoz_)
+    assert [s.jmbag for s in razlike.novi] == ["0036000099", "0036000098"]
+    assert razlike.ispisani == razlike.ponovno_upisani == ()
+    novi = primijeni(zamrznuti, razlike)
+    assert novi[:3] == zamrznuti
+    assert novi[3:] == (
+        Student(79, "0036000099", "Marta", "Babić", True),
+        Student(80, "0036000098", "Nera", "Zec", True),
+    )
+
+
+def test_kasni_upis_iz_isvu_izvoza(tmp_path):
+    putanja, zamrznuti = _zamrznuto(tmp_path)
+    razlike = usporedi(zamrznuti, _studenti(KASNI_UPIS))
+    assert razlike.ima_promjena
+    spremi(primijeni(zamrznuti, razlike), putanja)
+    novi = procitaj_zamrznuti(putanja)
+    assert novi[:5] == zamrznuti
+    assert novi[5] == Student(6, "0036000006", "Marta", "Babić", True)
+    assert usporedi(novi, _studenti(KASNI_UPIS)) == Razlike()
+
+
+def test_ispis_zadrzava_rbr_i_postaje_neaktivan(tmp_path):
+    putanja, zamrznuti = _zamrznuto(tmp_path)
+    razlike = usporedi(zamrznuti, _studenti(ISPIS))
+    # Šimić je „ispisan …“, Čačića nema u izvozu; Žužić je već neaktivna.
+    assert [s.rbr for s in razlike.ispisani] == [2, 4]
+    assert razlike.novi == razlike.ponovno_upisani == ()
+    spremi(primijeni(zamrznuti, razlike), putanja)
+    novi = procitaj_zamrznuti(putanja)
+    assert [(s.rbr, s.jmbag, s.aktivan) for s in novi] == [
+        (s.rbr, s.jmbag, s.rbr not in (2, 3, 4)) for s in zamrznuti
+    ]
+    assert [(s.ime, s.prezime) for s in novi] == [(s.ime, s.prezime) for s in zamrznuti]
+
+
+def test_ponovni_upis_postaje_aktivan(tmp_path):
+    _, zamrznuti = _zamrznuto(tmp_path)
+    razlike = usporedi(zamrznuti, _studenti(PONOVNI_UPIS))
+    assert [s.rbr for s in razlike.ponovno_upisani] == [3]
+    assert razlike.novi == razlike.ispisani == ()
+    novi = primijeni(zamrznuti, razlike)
+    assert novi[2] == Student(3, "0036000003", "Ivana", "Žužić", True)
+    assert all(n == z for n, z in zip(novi, zamrznuti, strict=True) if n.rbr != 3)
+
+
+def test_promjena_imena_je_samo_upozorenje(tmp_path):
+    _, zamrznuti = _zamrznuto(tmp_path)
+    retci = tuple(
+        (*redak[:2], "Đurđa", *redak[3:]) if redak[1] == "0036000002" else redak
+        for redak in ISPRAVNI
+    )
+    razlike = usporedi(zamrznuti, _studenti(retci))
+    assert not razlike.ima_promjena
+    assert len(razlike.promijenjeno_ime) == 1
+    promjena = razlike.promijenjeno_ime[0]
+    assert (promjena.zamrznuti.ime, promjena.izvoz.ime) == ("Đuro", "Đurđa")
+    assert primijeni(zamrznuti, razlike) == zamrznuti
+
+
+@pytest.mark.parametrize(
+    ("ime", "zapisano"),
+    [
+        ("=SUM(A1)", "'=SUM(A1)"),
+        ("+1", "'+1"),
+        ("-x", "'-x"),
+        ("@cmd", "'@cmd"),
+        ("\tx", "'\tx"),
+        ("\rx", "'\rx"),
+        ("'=a", "''=a"),
+        ("'Ana", "''Ana"),
+        ("Ana", "Ana"),
+    ],
+)
+def test_zastita_od_formula(tmp_path, ime, zapisano):
+    studenti = (Student(1, "0036000001", ime, "=Horvat", True),)
+    putanja = zamrzni(studenti, tmp_path)
+    tekst = putanja.read_bytes().decode("utf-8-sig")  # bez prevođenja \r
+    _, redak = list(csv.reader(io.StringIO(tekst, newline="")))
+    assert redak == ["1", "0036000001", zapisano, "'=Horvat", "true"]
+    assert procitaj_zamrznuti(putanja) == studenti
+
+
+def test_istodobno_zamrzavanje_ne_prepisuje_popis(tmp_path, monkeypatch):
+    import provjera.adapteri.popis as modul
+
+    putanja = tmp_path / "popis.csv"
+    pravi_link = modul.os.link
+
+    def drugi_stigao_prvi(izvor, cilj):
+        Path(cilj).write_bytes(b"drugi")  # zamrznut nakon provjere postojanja
+        pravi_link(izvor, cilj)
+
+    monkeypatch.setattr(modul.os, "link", drugi_stigao_prvi)
+    with pytest.raises(PopisVecZamrznut):
+        zamrzni(_studenti(ISPRAVNI), tmp_path)
+    assert putanja.read_bytes() == b"drugi"
+    assert [p.name for p in tmp_path.iterdir()] == ["popis.csv"]
+
+
+def _bez_tvrdih_poveznica(*_args):
+    raise OSError(errno.EPERM, "tvrde poveznice nisu podržane")
+
+
+def test_zamrzavanje_bez_tvrdih_poveznica(tmp_path, monkeypatch):
+    import provjera.adapteri.popis as modul
+
+    ocekivano = zamrzni(_studenti(ISPRAVNI), tmp_path / "s_poveznicom").read_bytes()
+    monkeypatch.setattr(modul.os, "link", _bez_tvrdih_poveznica)
+    putanja = zamrzni(_studenti(ISPRAVNI), tmp_path / "bez_poveznice")
+    assert putanja.read_bytes() == ocekivano
+    assert [p.name for p in putanja.parent.iterdir()] == ["popis.csv"]
+
+
+def test_zamrzavanje_bez_tvrdih_poveznica_ne_prepisuje(tmp_path, monkeypatch):
+    import provjera.adapteri.popis as modul
+
+    putanja = tmp_path / "popis.csv"
+
+    def drugi_stigao_prvi(_izvor, cilj):
+        Path(cilj).write_bytes(b"drugi")  # pojavio se prije zamjenskog stvaranja
+        _bez_tvrdih_poveznica()
+
+    monkeypatch.setattr(modul.os, "link", drugi_stigao_prvi)
+    with pytest.raises(PopisVecZamrznut):
+        zamrzni(_studenti(ISPRAVNI), tmp_path)
+    assert putanja.read_bytes() == b"drugi"
+    assert [p.name for p in tmp_path.iterdir()] == ["popis.csv"]
+
+
+def test_ime_sa_zarezom_i_navodnicima(tmp_path):
+    studenti = (Student(1, "0036000001", 'Ana, "Mia"', "Horvat", False),)
+    assert procitaj_zamrznuti(zamrzni(studenti, tmp_path)) == studenti
+
+
+def _csv(tmp_path: Path, tekst: str, bom: bool = True) -> Path:
+    putanja = tmp_path / "popis.csv"
+    putanja.write_bytes((b"\xef\xbb\xbf" if bom else b"") + tekst.encode("utf-8"))
+    return putanja
+
+
+ZAGLAVLJE_CSV = "rbr,jmbag,ime,prezime,aktivan\r\n"
+ANA = "1,0036000001,Ana,Horvat,true\r\n"
+
+
+@pytest.mark.parametrize(
+    ("sadrzaj", "redak", "kljuc"),
+    [
+        ("", None, "popis.zamrznuti_prazan"),
+        (ZAGLAVLJE_CSV, None, "popis.zamrznuti_prazan"),
+        ("rbr,jmbag,ime,prezime\r\n1,0036000001,Ana,Horvat\r\n", 1, "popis.zamrznuti_zaglavlje"),
+        ("jmbag,rbr,ime,prezime,aktivan\r\n", 1, "popis.zamrznuti_zaglavlje"),
+        (ZAGLAVLJE_CSV + "1,0036000001,Ana,Horvat\r\n", 2, "popis.zamrznuti_broj_stupaca"),
+        (ZAGLAVLJE_CSV + ANA + "a,0036000002,Ivo,Babić,true\r\n", 3, "popis.rbr_neispravan"),
+        (ZAGLAVLJE_CSV + "0,0036000001,Ana,Horvat,true\r\n", 2, "popis.rbr_neispravan"),
+        (ZAGLAVLJE_CSV + "1,36000001,Ana,Horvat,true\r\n", 2, "popis.jmbag_neispravan"),
+        (ZAGLAVLJE_CSV + "1,0036000001,Ana,Horvat,da\r\n", 2, "popis.zamrznuti_aktivan"),
+        (ZAGLAVLJE_CSV + "1,0036000001,,Horvat,true\r\n", 2, "popis.prazno_ime"),
+        (ZAGLAVLJE_CSV + "1,0036000001,Ana, ,true\r\n", 2, "popis.prazno_prezime"),
+        (ZAGLAVLJE_CSV + ANA + "1,0036000002,Ivo,Babić,true\r\n", 3, "popis.dupli_rbr"),
+        (ZAGLAVLJE_CSV + ANA + "2,0036000001,Ivo,Babić,true\r\n", 3, "popis.dupli_jmbag"),
+    ],
+)
+def test_ostecen_csv_daje_gresku_s_retkom(tmp_path, sadrzaj, redak, kljuc):
+    with pytest.raises(GreskaZamrznutog) as greska:
+        procitaj_zamrznuti(_csv(tmp_path, sadrzaj))
+    assert (greska.value.redak, greska.value.poruka_kljuc) == (redak, kljuc)
+    assert poruka(greska.value.poruka_kljuc, **greska.value.parametri)
+
+
+@pytest.mark.parametrize(
+    "sadrzaj",
+    [b"\xff\xfe\x00nije utf-8", (ZAGLAVLJE_CSV + '1,0036000001,"Ana,Horvat,true\r\n').encode()],
+)
+def test_necitljiv_csv(tmp_path, sadrzaj):
+    putanja = tmp_path / "popis.csv"
+    putanja.write_bytes(sadrzaj)
+    with pytest.raises(GreskaZamrznutog) as greska:
+        procitaj_zamrznuti(putanja)
+    assert greska.value.poruka_kljuc == "popis.zamrznuti_necitljiv"
+
+
+def test_nepostojeci_csv_daje_gresku(tmp_path):
+    with pytest.raises(GreskaZamrznutog) as greska:
+        procitaj_zamrznuti(tmp_path / "ne_postoji.csv")
+    assert (greska.value.redak, greska.value.poruka_kljuc) == (None, "popis.zamrznuti_necitljiv")
+
+
+def test_csv_bez_bom_a_i_s_lf_je_citljiv(tmp_path):
+    tekst = "rbr,jmbag,ime,prezime,aktivan\n1,0036000001,Ana,Horvat,true\n"
+    putanja = _csv(tmp_path, tekst, bom=False)
+    assert procitaj_zamrznuti(putanja) == (Student(1, "0036000001", "Ana", "Horvat", True),)
+
+
+def test_neuspjelo_pisanje_ne_mijenja_popis_ni_ostavlja_privremenu(tmp_path, monkeypatch):
+    import provjera.adapteri.popis as modul
+
+    putanja, zamrznuti = _zamrznuto(tmp_path)
+    prije = putanja.read_bytes()
+
+    def pukni(*_args):
+        raise OSError("disk pun")
+
+    monkeypatch.setattr(modul.os, "replace", pukni)
+    with pytest.raises(OSError):
+        spremi(zamrznuti[:1], putanja)
+    assert putanja.read_bytes() == prije
+    assert [p.name for p in putanja.parent.iterdir()] == ["popis.csv"]
+
+
+def test_log_zamrzavanja_ne_sadrzi_osobne_podatke(tmp_path, caplog):
+    with caplog.at_level(logging.DEBUG):
+        putanja, zamrznuti = _zamrznuto(tmp_path)
+        spremi(primijeni(zamrznuti, usporedi(zamrznuti, _studenti(KASNI_UPIS))), putanja)
+    for s in procitaj_zamrznuti(putanja):
+        for podatak in (s.jmbag, s.ime, s.prezime):
+            assert podatak not in caplog.text

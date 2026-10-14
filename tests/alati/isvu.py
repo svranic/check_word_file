@@ -73,6 +73,24 @@ S_GRESKAMA: tuple[Redak, ...] = (
 )
 
 
+# Varijante kasnijeg izvoza istog predmeta (priča 3.2). ISVU sortira po prezimenu i
+# prenumerira, pa se Rbr. iz izvoza ne podudara sa zamrznutim popisom.
+def _prenumerirano(retci: Sequence[Redak]) -> tuple[Redak, ...]:
+    return tuple((f"{i}.", *redak[1:]) for i, redak in enumerate(retci, 1))  # type: ignore[misc]
+
+
+PRENUMERIRANI: tuple[Redak, ...] = _prenumerirano(tuple(reversed(ISPRAVNI)))
+KASNI_UPIS: tuple[Redak, ...] = _prenumerirano(
+    (ISPRAVNI[0], ("", "0036000006", "Marta", "Babić", UPISAN), *ISPRAVNI[1:])
+)
+ISPIS: tuple[Redak, ...] = _prenumerirano(
+    (ISPRAVNI[0], (*ISPRAVNI[1][:4], ISPISAN), ISPRAVNI[2], ISPRAVNI[4])  # 4. student nestao
+)
+PONOVNI_UPIS: tuple[Redak, ...] = tuple(
+    (*redak[:4], UPISAN) if redak[1] == "0036000003" else redak for redak in ISPRAVNI
+)
+
+
 def izvoz(
     retci: Sequence[Redak],
     *,

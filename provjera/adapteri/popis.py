@@ -1,14 +1,22 @@
-"""ISVU popis studenata (AD-1): jedini čitač ISVU ``.xlsx`` izvoza (openpyxl).
+"""ISVU popis studenata (AD-1): jedini čitač ISVU ``.xlsx`` izvoza (openpyxl) i
+jedini vlasnik formata zamrznutog popisa ``<podatkovna mapa>/<vjezba>/popis.csv``.
 
 ``ucitaj_isvu`` sam pronalazi zaglavlje ispod metapodataka izvoza, normalizira
 vrijednosti i vraća studente zajedno s potpunim popisom pogrešaka po retku.
+``zamrzni``, ``procitaj_zamrznuti``, ``usporedi``, ``primijeni`` i ``spremi``
+upravljaju zamrznutim popisom: Rbr. se nikad ne mijenja, a novi izvoz ne prepisuje
+postojeći popis nego se s njim uspoređuje po JMBAG-u.
 Osobni podaci se ne zapisuju u log.
 """
 
+import csv
 import io
 import logging
-from collections.abc import Mapping
+import os
+import tempfile
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from types import MappingProxyType
 
 import openpyxl
@@ -212,3 +220,272 @@ def ucitaj_isvu(sadrzaj: bytes) -> UcitaniPopis:
         greske.append(GreskaRetka(None, "popis.bez_studenata"))
     log.info("ISVU izvoz: %d studenata, %d pogrešaka", len(studenti), len(greske))
     return UcitaniPopis(tuple(studenti), tuple(greske))
+
+
+# --- Zamrznuti popis (priča 3.2) ----------------------------------------------
+
+DATOTEKA_POPISA = "popis.csv"
+STUPCI_ZAMRZNUTOG = ("rbr", "jmbag", "ime", "prezime", "aktivan")
+KODIRANJE = "utf-8-sig"  # UTF-8 s BOM-om, da ga Excel ispravno otvori
+ISTINA, LAZ = "true", "false"
+ZNAKOVI_FORMULE = ("=", "+", "-", "@", "\t", "\r")
+PREFIKS_TEKSTA = "'"
+
+
+class GreskaZamrznutog(Exception):
+    """Zamrznuti popis nije čitljiv; ``redak`` je redak u CSV-u (1 = zaglavlje) ili ``None``."""
+
+    def __init__(
+        self,
+        redak: int | None,
+        poruka_kljuc: str,
+        parametri: Mapping[str, str | int] | None = None,
+    ) -> None:
+        super().__init__(poruka_kljuc)
+        self.redak = redak
+        self.poruka_kljuc = poruka_kljuc
+        self.parametri: Mapping[str, str | int] = MappingProxyType(dict(parametri or {}))
+
+
+class PopisVecZamrznut(Exception):
+    """``popis.csv`` već postoji; novi izvoz ga nikad ne prepisuje."""
+
+
+@dataclass(frozen=True)
+class PromjenaImena:
+    zamrznuti: Student
+    izvoz: Student
+
+
+@dataclass(frozen=True)
+class Razlike:
+    """Razlike zamrznutog popisa i novog izvoza, uspoređene po JMBAG-u (nikad po Rbr.)."""
+
+    novi: tuple[Student, ...] = ()  # iz izvoza, redoslijedom izvoza (Rbr. je ISVU-ov)
+    ispisani: tuple[Student, ...] = ()  # iz zamrznutog popisa
+    ponovno_upisani: tuple[Student, ...] = ()  # iz zamrznutog popisa
+    promijenjeno_ime: tuple[PromjenaImena, ...] = ()  # samo upozorenje, ne primjenjuje se
+
+    @property
+    def ima_promjena(self) -> bool:
+        """Ima li promjena koje ``primijeni`` zapisuje (promjena imena se ne primjenjuje)."""
+        return bool(self.novi or self.ispisani or self.ponovno_upisani)
+
+
+def putanja_popisa(mapa_vjezbe: Path) -> Path:
+    return mapa_vjezbe / DATOTEKA_POPISA
+
+
+def _zasticeno(vrijednost: str) -> str:
+    """Prefiks ``'`` sprječava da Excel vrijednost protumači kao formulu.
+
+    Prefiks dobiva i vrijednost koja već počinje s ``'``, pa je kružni put bez gubitaka.
+    """
+    if vrijednost.startswith((*ZNAKOVI_FORMULE, PREFIKS_TEKSTA)):
+        return PREFIKS_TEKSTA + vrijednost
+    return vrijednost
+
+
+def _bez_zastite(vrijednost: str) -> str:
+    if vrijednost.startswith(PREFIKS_TEKSTA) and vrijednost[1:].startswith(
+        (*ZNAKOVI_FORMULE, PREFIKS_TEKSTA)
+    ):
+        return vrijednost[1:]
+    return vrijednost
+
+
+def _provjeri_studente(studenti: Sequence[Student]) -> None:
+    """Zapisuje se samo popis koji se može ponovno pročitati (inače je to pogreška u kodu)."""
+    if not studenti:
+        raise ValueError("popis bez studenata se ne zapisuje")
+    if len({s.rbr for s in studenti}) != len(studenti):
+        raise ValueError("Rbr. u popisu nisu jedinstveni")
+    if len({s.jmbag for s in studenti}) != len(studenti):
+        raise ValueError("JMBAG-ovi u popisu nisu jedinstveni")
+    for s in studenti:
+        if s.rbr < 1 or not _jmbag_valjan(s.jmbag) or not s.ime.strip() or not s.prezime.strip():
+            raise ValueError("student u popisu nije ispravan")
+
+
+def _zapisi(studenti: Sequence[Student], putanja: Path, *, iskljucivo: bool) -> None:
+    """Zapisuje privremenu datoteku u istoj mapi pa je atomski postavlja na ``putanja``.
+
+    ``iskljucivo`` (prvo zamrzavanje) koristi ``os.link``, koji ne uspijeva ako datoteka
+    već postoji, pa ni istodobno zamrzavanje ne može prepisati postojeći popis.
+    """
+    _provjeri_studente(studenti)
+    putanja.parent.mkdir(parents=True, exist_ok=True)
+    izlaz = io.StringIO()
+    pisac = csv.writer(izlaz, lineterminator="\r\n")
+    pisac.writerow(STUPCI_ZAMRZNUTOG)
+    for s in studenti:
+        pisac.writerow(
+            (
+                s.rbr,
+                _zasticeno(s.jmbag),
+                _zasticeno(s.ime),
+                _zasticeno(s.prezime),
+                ISTINA if s.aktivan else LAZ,
+            )
+        )
+    opisnik, privremena = tempfile.mkstemp(
+        prefix=f".{DATOTEKA_POPISA}.", suffix=".tmp", dir=putanja.parent
+    )
+    sadrzaj = izlaz.getvalue().encode(KODIRANJE)
+    try:
+        with os.fdopen(opisnik, "wb") as datoteka:
+            datoteka.write(sadrzaj)
+            datoteka.flush()
+            os.fsync(datoteka.fileno())
+        if iskljucivo:
+            try:
+                os.link(privremena, putanja)
+            except FileExistsError as greska:
+                raise PopisVecZamrznut(str(putanja)) from greska
+            except OSError:
+                # Datotečni sustav bez tvrdih poveznica (FAT, neki mrežni diskovi).
+                _stvori_iskljucivo(putanja, sadrzaj)
+        else:
+            os.replace(privremena, putanja)
+    finally:
+        Path(privremena).unlink(missing_ok=True)
+    log.info("Zamrznuti popis zapisan: %d studenata", len(studenti))
+
+
+def _stvori_iskljucivo(putanja: Path, sadrzaj: bytes) -> None:
+    """Zamjena za ``os.link``: stvaranje koje ne uspijeva ako datoteka već postoji (``"xb"``)."""
+    try:
+        datoteka = open(putanja, "xb")  # noqa: SIM115 — zatvara se odmah ispod
+    except FileExistsError as greska:
+        raise PopisVecZamrznut(str(putanja)) from greska
+    try:
+        with datoteka:
+            datoteka.write(sadrzaj)
+            datoteka.flush()
+            os.fsync(datoteka.fileno())
+    except BaseException:
+        putanja.unlink(missing_ok=True)  # nedovršen popis koji je stvorio ovaj poziv
+        raise
+
+
+def spremi(studenti: Sequence[Student], putanja: Path) -> None:
+    """Atomski zapisuje (i prepisuje) popis: privremena datoteka pa ``os.replace``."""
+    _zapisi(studenti, putanja, iskljucivo=False)
+
+
+def zamrzni(studenti: Sequence[Student], mapa_vjezbe: Path) -> Path:
+    """Prvo zamrzavanje; postojeći ``popis.csv`` se nikad ne prepisuje (``PopisVecZamrznut``).
+
+    Pozivatelj zamrzava samo popis za koji je ``UcitaniPopis.moze_zamrznuti``.
+    """
+    putanja = putanja_popisa(mapa_vjezbe)
+    if putanja.exists():
+        raise PopisVecZamrznut(str(putanja))
+    _zapisi(studenti, putanja, iskljucivo=True)
+    return putanja
+
+
+def procitaj_zamrznuti(putanja: Path) -> tuple[Student, ...]:
+    """Čita i provjerava ``popis.csv``; neispravna datoteka baca ``GreskaZamrznutog``."""
+    try:
+        tekst = putanja.read_bytes().decode(KODIRANJE)
+    except (OSError, UnicodeDecodeError) as greska:
+        raise GreskaZamrznutog(None, "popis.zamrznuti_necitljiv") from greska
+
+    citac = csv.reader(io.StringIO(tekst, newline=""), strict=True)
+    studenti: list[Student] = []
+    try:
+        zaglavlje = next(citac, None)
+        if zaglavlje is None:
+            raise GreskaZamrznutog(None, "popis.zamrznuti_prazan")
+        if tuple(zaglavlje) != STUPCI_ZAMRZNUTOG:
+            raise GreskaZamrznutog(
+                1, "popis.zamrznuti_zaglavlje", {"stupci": ",".join(STUPCI_ZAMRZNUTOG)}
+            )
+        redak_rbr: dict[int, int] = {}
+        redak_jmbag: dict[str, int] = {}
+        for redak in citac:
+            broj_retka = citac.line_num
+            if not redak:
+                continue  # prazan redak (npr. na kraju datoteke)
+            if len(redak) != len(STUPCI_ZAMRZNUTOG):
+                raise GreskaZamrznutog(
+                    broj_retka,
+                    "popis.zamrznuti_broj_stupaca",
+                    {"ocekivano": len(STUPCI_ZAMRZNUTOG), "pronadeno": len(redak)},
+                )
+            rbr_tekst, jmbag, ime, prezime, aktivan = (_bez_zastite(v) for v in redak)
+            if not (rbr_tekst.isascii() and rbr_tekst.isdigit()) or int(rbr_tekst) < 1:
+                raise GreskaZamrznutog(broj_retka, "popis.rbr_neispravan")
+            broj = int(rbr_tekst)
+            if broj in redak_rbr:
+                raise GreskaZamrznutog(
+                    broj_retka, "popis.dupli_rbr", {"rbr": broj, "prvi": redak_rbr[broj]}
+                )
+            if not _jmbag_valjan(jmbag):
+                raise GreskaZamrznutog(broj_retka, "popis.jmbag_neispravan")
+            if jmbag in redak_jmbag:
+                raise GreskaZamrznutog(
+                    broj_retka, "popis.dupli_jmbag", {"prvi": redak_jmbag[jmbag]}
+                )
+            if not ime.strip():
+                raise GreskaZamrznutog(broj_retka, "popis.prazno_ime")
+            if not prezime.strip():
+                raise GreskaZamrznutog(broj_retka, "popis.prazno_prezime")
+            if aktivan not in (ISTINA, LAZ):
+                raise GreskaZamrznutog(broj_retka, "popis.zamrznuti_aktivan")
+            redak_rbr[broj] = broj_retka
+            redak_jmbag[jmbag] = broj_retka
+            studenti.append(Student(broj, jmbag, ime, prezime, aktivan == ISTINA))
+    except csv.Error as greska:
+        raise GreskaZamrznutog(citac.line_num or None, "popis.zamrznuti_necitljiv") from greska
+    if not studenti:
+        raise GreskaZamrznutog(None, "popis.zamrznuti_prazan")
+    return tuple(studenti)
+
+
+def usporedi(zamrznuti: Sequence[Student], izvoz: Sequence[Student]) -> Razlike:
+    """Uspoređuje po JMBAG-u; Rbr. iz izvoza se zanemaruje (ISVU prenumerira)."""
+    po_jmbagu_izvoz = {s.jmbag: s for s in izvoz}
+    zamrznuti_jmbag = {s.jmbag for s in zamrznuti}
+    novi = tuple(s for s in izvoz if s.aktivan and s.jmbag not in zamrznuti_jmbag)
+    ispisani: list[Student] = []
+    ponovno: list[Student] = []
+    imena: list[PromjenaImena] = []
+    for s in zamrznuti:
+        u_izvozu = po_jmbagu_izvoz.get(s.jmbag)
+        aktivan_u_izvozu = u_izvozu is not None and u_izvozu.aktivan
+        if s.aktivan and not aktivan_u_izvozu:
+            ispisani.append(s)
+        elif not s.aktivan and aktivan_u_izvozu:
+            ponovno.append(s)
+        if u_izvozu is not None and (u_izvozu.ime, u_izvozu.prezime) != (s.ime, s.prezime):
+            imena.append(PromjenaImena(s, u_izvozu))
+    return Razlike(novi, tuple(ispisani), tuple(ponovno), tuple(imena))
+
+
+def sljedeci_rbr(zamrznuti: Sequence[Student]) -> int:
+    """Rbr. koji dobiva prvi kasno upisani student: ``max(rbr)+1``."""
+    return max((s.rbr for s in zamrznuti), default=0) + 1
+
+
+def primijeni(zamrznuti: Sequence[Student], razlike: Razlike) -> tuple[Student, ...]:
+    """Novi dobivaju ``max(rbr)+1``, ``+2``…; postojećima se mijenja samo ``aktivan``."""
+    ispisani = {s.jmbag for s in razlike.ispisani}
+    ponovno = {s.jmbag for s in razlike.ponovno_upisani}
+    postojeci = {s.jmbag for s in zamrznuti}
+    rezultat: list[Student] = []
+    for s in zamrznuti:
+        if s.jmbag in ispisani:
+            s = Student(s.rbr, s.jmbag, s.ime, s.prezime, aktivan=False)
+        elif s.jmbag in ponovno:
+            s = Student(s.rbr, s.jmbag, s.ime, s.prezime, aktivan=True)
+        rezultat.append(s)
+    sljedeci = sljedeci_rbr(zamrznuti)
+    for s in razlike.novi:
+        if s.jmbag in postojeci:
+            continue
+        postojeci.add(s.jmbag)
+        rezultat.append(Student(sljedeci, s.jmbag, s.ime, s.prezime, aktivan=True))
+        sljedeci += 1
+    return tuple(rezultat)
