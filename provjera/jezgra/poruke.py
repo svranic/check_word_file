@@ -24,6 +24,15 @@ _UPUTA_STILOVI = (
     "primijeni na riječi gdje su potrebni."
 )
 
+# Zajednička uputa R-BROJ-STRANICE: broj u podnožju u stilu Podnožje (Footer).
+_UPUTA_PODNOZJE = (
+    " Broj mora biti u stilu Podnožje (Footer), koji određuje njegov font i veličinu. Ako "
+    "je broj stavljen u zaglavlje (Header, vrh stranice), obriši ga odande i umetni u "
+    "podnožje (Bottom of Page). Ako "
+    "sekcija koristi podnožje prethodne sekcije (Poveži s prethodnim (Link to Previous)), "
+    "provjeri da se broj pritom ne pojavi i na naslovnici."
+)
+
 KATALOG: Mapping[str, str] = MappingProxyType(
     {
         "app.naslov": "Provjera Word dokumenata",
@@ -434,6 +443,73 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "R-STILOVI.izravna_uvlaka": (
             "Uvlaka odlomka ({strana}: {pronadeno}) zadana je ručno, a ne kroz stil, čak i ako "
             "je ispravna." + _UPUTA_STILOVI
+        ),
+        "pravilo.R-BROJ-STRANICE": "Numeriranje stranica",
+        "R-BROJ-STRANICE.prolazi": (
+            "Broj stranice u podnožjima je ispravno postavljen."
+        ),
+        "R-BROJ-STRANICE.bez_sekcija": (
+            "U dokumentu nisu zapisane postavke sekcija pa podnožja nije moguće provjeriti."
+        ),
+        "R-BROJ-STRANICE.bez_broja": (
+            "Podnožje ove sekcije nema broj stranice. Dvaput klikni u podnožje stranice ove "
+            "sekcije i umetni broj: Umetanje (Insert) → Broj stranice (Page Number) → Dno "
+            "stranice (Bottom of Page). Word tada sam broji stranice." + _UPUTA_PODNOZJE
+        ),
+        "R-BROJ-STRANICE.bez_broja_prva": (
+            "Sekcija ima uključenu Drukčiju prvu stranicu (Different First Page), a podnožje "
+            "njezine prve stranice nema broj stranice. Dvaput klikni u podnožje prve stranice "
+            "sekcije i umetni broj: Umetanje (Insert) → Broj stranice (Page Number) → Dno "
+            "stranice (Bottom of Page), ili isključi Dizajn zaglavlja i podnožja (Header & "
+            "Footer) → Drukčija prva stranica (Different First Page)." + _UPUTA_PODNOZJE
+        ),
+        "R-BROJ-STRANICE.bez_broja_parna": (
+            "Dokument ima uključene Drukčije parne i neparne stranice (Different Odd & Even "
+            "Pages), a podnožje parnih stranica ove sekcije nema broj stranice. Dvaput klikni "
+            "u podnožje parne stranice i umetni broj: Umetanje (Insert) → Broj stranice (Page "
+            "Number) → Dno stranice (Bottom of Page), ili isključi Dizajn zaglavlja i podnožja "
+            "(Header & Footer) → Drukčije parne i neparne stranice (Different Odd & Even Pages)."
+            + _UPUTA_PODNOZJE
+        ),
+        "R-BROJ-STRANICE.rucni_broj": (
+            "Broj stranice u podnožju ove sekcije upisan je ručno, a ne kao Wordov broj "
+            "stranice. Ručno upisan broj isti je na svakoj stranici i ne mijenja se kad se "
+            "tekst pomakne. Obriši upisani broj i umetni pravi: Umetanje (Insert) → Broj "
+            "stranice (Page Number) → Dno stranice (Bottom of Page)." + _UPUTA_PODNOZJE
+        ),
+        "R-BROJ-STRANICE.naslovnica_ima_broj": (
+            "Naslovnica ne smije imati broj stranice, a njezino podnožje ga ima. Najčešće je "
+            "podnožje tijela povezano s naslovnicom. Dvaput klikni u podnožje prve stranice "
+            "rada nakon naslovnice i isključi Dizajn zaglavlja i podnožja (Header & Footer) → "
+            "Poveži s prethodnim (Link to Previous), a zatim obriši broj iz podnožja "
+            "naslovnice. Druga mogućnost je u sekciji naslovnice uključiti Dizajn zaglavlja i "
+            "podnožja (Header & Footer) → Drukčija prva stranica (Different First Page)."
+        ),
+        "R-BROJ-STRANICE.font": (
+            "Font broja stranice je {pronadeno}, a treba biti {ocekivano}. Broj stranice "
+            "preuzima oblikovanje stila Podnožje (Footer): Početna (Home) → Stilovi (Styles) → "
+            "desni klik na Podnožje (Footer) → Izmijeni (Modify) → Oblikovanje (Formatting) → "
+            "{ocekivano}. Ako je font zadan ručno, označi broj u podnožju i pritisni Ctrl+Space."
+        ),
+        "R-BROJ-STRANICE.font_tema": (
+            "Font broja stranice je {pronadeno}, a treba biti {ocekivano}. Stil Podnožje "
+            "(Footer) ne navodi font pa Word uzima font teme dokumenta (u novijim verzijama "
+            "Aptos). Odaberi Dizajn (Design) → Fontovi (Fonts) i skup u kojem je font tijela "
+            "{ocekivano}, ili zadaj font u stilu: Početna (Home) → Stilovi (Styles) → desni "
+            "klik na Podnožje (Footer) → Izmijeni (Modify) → Oblikovanje (Formatting) → "
+            "{ocekivano}."
+        ),
+        "R-BROJ-STRANICE.font_nepoznat": (
+            "Font broja stranice trebao bi doći iz teme dokumenta, ali tema nije zapisana u "
+            "datoteci pa font nije moguće odrediti. Zadaj font izravno u stilu: Početna (Home) "
+            "→ Stilovi (Styles) → desni klik na Podnožje (Footer) → Izmijeni (Modify) → "
+            "Oblikovanje (Formatting) → {ocekivano}."
+        ),
+        "R-BROJ-STRANICE.velicina": (
+            "Veličina broja stranice je {pronadeno}, a treba biti {ocekivano}. Promijeni je u "
+            "stilu: Početna (Home) → Stilovi (Styles) → desni klik na Podnožje (Footer) → "
+            "Izmijeni (Modify) → Oblikovanje (Formatting) → {ocekivano}. Ako je veličina "
+            "zadana ručno, označi broj u podnožju i pritisni Ctrl+Space."
         ),
         "poravnanje.lijevo": "lijevo (Align Left)",
         "poravnanje.sredina": "centrirano (Center)",

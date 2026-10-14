@@ -157,10 +157,42 @@ def _sadrzaj(dokument, profil: Profil) -> None:
             dokument.add_paragraph("Drugi odlomak osnovnog teksta istog poglavlja.")
 
 
+def _footer(dokument, profil: Profil) -> None:
+    """Stil Footer točno po [pravila.R-BROJ-STRANICE]."""
+    broj = profil.pravila["R-BROJ-STRANICE"]
+    stil = dokument.styles["Footer"]
+    stil.font.name = broj.font
+    stil.font.size = Pt(broj.velicina / 2)
+
+
+def polje_page(odlomak, naredba: str = r" PAGE   \* MERGEFORMAT ", rezultat: str = "2", rpr: str = "") -> None:
+    """Složeno polje (fldChar/instrText) kako ga Word zapisuje; ``rpr`` je XML za run rezultata."""
+    w = nsdecls("w")
+    for xml in (
+        f'<w:r {w}><w:fldChar w:fldCharType="begin"/></w:r>',
+        f'<w:r {w}><w:instrText xml:space="preserve">{naredba}</w:instrText></w:r>',
+        f'<w:r {w}><w:fldChar w:fldCharType="separate"/></w:r>',
+        f'<w:r {w}>{rpr}<w:t>{rezultat}</w:t></w:r>',
+        f'<w:r {w}><w:fldChar w:fldCharType="end"/></w:r>',
+    ):
+        odlomak._p.append(parse_xml(xml))
+
+
+def podnozje_s_brojem(sekcija):
+    """Vlastito podnožje sekcije (nije povezano s prethodnim) s poljem PAGE u stilu Footer."""
+    podnozje = sekcija.footer
+    podnozje.is_linked_to_previous = False
+    odlomak = podnozje.paragraphs[0]
+    odlomak.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    polje_page(odlomak)
+    return podnozje
+
+
 def _dokument(rbr: int, profil: Profil, jedna_sekcija: bool = False):
     dokument = docx.Document()
     _normal(dokument, profil)
     _heading1(dokument, profil)
+    _footer(dokument, profil)
     naslovnica = dokument.sections[0]
     _a4(naslovnica)
     tijelo = _tijelo(rbr, profil)
@@ -168,6 +200,7 @@ def _dokument(rbr: int, profil: Profil, jedna_sekcija: bool = False):
         _margine(naslovnica, **tijelo)
         dokument.add_paragraph("Ana Horvat, 0000000000")
         _sadrzaj(dokument, profil)
+        podnozje_s_brojem(naslovnica)
         return dokument
     _margine(naslovnica, *(mm_u_twips(profil.formula.naslovnica),) * 4)
     dokument.add_paragraph("Ana Horvat, 0000000000")
@@ -175,6 +208,8 @@ def _dokument(rbr: int, profil: Profil, jedna_sekcija: bool = False):
     _a4(sekcija)
     _margine(sekcija, **tijelo)
     _sadrzaj(dokument, profil)
+    # Naslovnica nema podnožje; tijelo ima vlastito s brojem stranice.
+    podnozje_s_brojem(sekcija)
     return dokument
 
 
@@ -410,6 +445,72 @@ def _stilovi_podebljano(dokument, rbr, profil):
     run.bold = run.italic = run.underline = True
 
 
+def _isprazni(podnozje):
+    """Briše sav sadržaj podnožja i vraća jedan prazan odlomak u stilu Footer."""
+    korijen = podnozje._element
+    for dijete in list(korijen):
+        korijen.remove(dijete)
+    return podnozje.add_paragraph(style="Footer")
+
+
+def _broj_rucni(dokument, rbr, profil):
+    """Broj „2“ upisan kao tekst umjesto polja."""
+    _isprazni(dokument.sections[1].footer).add_run("2")
+
+
+def _broj_nema(dokument, rbr, profil):
+    dokument.sections[1].footer.is_linked_to_previous = True
+
+
+def _broj_naslovnica(dokument, rbr, profil):
+    """Broj samo u podnožju naslovnice; tijelo ga nasljeđuje (Poveži s prethodnim)."""
+    podnozje_s_brojem(dokument.sections[0])
+    dokument.sections[1].footer.is_linked_to_previous = True
+
+
+def _broj_prva_stranica(dokument, rbr, profil):
+    """Drukčija prva stranica u tijelu, a podnožje prve stranice je prazno."""
+    sekcija = dokument.sections[1]
+    sekcija.different_first_page_header_footer = True
+    sekcija.first_page_footer.is_linked_to_previous = False
+
+
+def _broj_font(dokument, rbr, profil):
+    """Rezultat polja 11 pt (izravno na runu)."""
+    odlomak = _isprazni(dokument.sections[1].footer)
+    polje_page(odlomak, rpr=f'<w:rPr {nsdecls("w")}><w:sz w:val="22"/></w:rPr>')
+
+
+def _broj_galerija(dokument, rbr, profil):
+    """Broj iz Wordove galerije: odlomak s poljem unutar sdt „Page Numbers (Bottom of Page)“."""
+    odlomak = dokument.sections[1].footer.paragraphs[0]._p
+    sdt = parse_xml(
+        f'<w:sdt {nsdecls("w")}><w:sdtPr><w:id w:val="1824306713"/><w:docPartObj>'
+        '<w:docPartGallery w:val="Page Numbers (Bottom of Page)"/><w:docPartUnique/>'
+        "</w:docPartObj></w:sdtPr><w:sdtContent/></w:sdt>"
+    )
+    odlomak.addprevious(sdt)
+    sdt.find(qn("w:sdtContent")).append(odlomak)
+
+
+_VML = "urn:schemas-microsoft-com:vml"
+
+
+def _broj_okvir(dokument, rbr, profil):
+    """Polje PAGE u tekstnom okviru (VML v:textbox) u podnožju."""
+    podnozje = dokument.sections[1].footer
+    unutarnji = podnozje.paragraphs[0]._p
+    vanjski = _isprazni(podnozje)
+    run = parse_xml(
+        f'<w:r {nsdecls("w")} xmlns:v="{_VML}"><w:pict><v:shape id="Okvir1" type="#_x0000_t202" '
+        'style="position:absolute;margin-left:0;margin-top:0;width:60pt;height:20pt;'
+        'mso-position-horizontal:center">'
+        "<v:textbox><w:txbxContent/></v:textbox></v:shape></w:pict></w:r>"
+    )
+    run.find(f".//{qn('w:txbxContent')}").append(unutarnji)
+    vanjski._p.append(run)
+
+
 VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "ispravan": ispravan,
     "jedna_sekcija": lambda rbr, profil: _spremi(_dokument(rbr, profil, jedna_sekcija=True)),
@@ -443,6 +544,13 @@ VARIJANTE: dict[str, Callable[[int, Profil], bytes]] = {
     "stilovi_poravnanje": _izmijeni(_stilovi_poravnanje),
     "stilovi_naslov": _izmijeni(_stilovi_naslov),
     "stilovi_podebljano": _izmijeni(_stilovi_podebljano),
+    "broj_rucni": _izmijeni(_broj_rucni),
+    "broj_nema": _izmijeni(_broj_nema),
+    "broj_naslovnica": _izmijeni(_broj_naslovnica),
+    "broj_prva_stranica": _izmijeni(_broj_prva_stranica),
+    "broj_font": _izmijeni(_broj_font),
+    "broj_galerija": _izmijeni(_broj_galerija),
+    "broj_okvir": _izmijeni(_broj_okvir),
 }
 
 

@@ -17,11 +17,20 @@ from docx.oxml.ns import qn
 from docx.oxml.parser import parse_xml
 
 from provjera.jezgra.model.numeracija import Brojaci, Numeracija
+from provjera.jezgra.model.podnozja import (
+    Podnozje,
+    PodnozjaSekcije,
+    PoljeStranice,
+    VrstaPodnozja,
+    je_istina,
+    podnozja_sekcija,
+)
 from provjera.jezgra.model.stilovi import (
     Efektivno,
     Poravnanje,
     PraviloProreda,
     Prored,
+    Run,
     Stil,
     Stilovi,
 )
@@ -41,6 +50,9 @@ __all__ = [
     "NepodrzaniDokument",
     "Numeracija",
     "Odlomak",
+    "Podnozje",
+    "PodnozjaSekcije",
+    "PoljeStranice",
     "Poravnanje",
     "PraviloProreda",
     "Prored",
@@ -48,6 +60,7 @@ __all__ = [
     "Sekcija",
     "Stil",
     "TipPocetka",
+    "VrstaPodnozja",
     "procitaj",
 ]
 
@@ -94,14 +107,10 @@ class Sekcija:
     visina: int | None
     pejzazno: bool
     pocetak: TipPocetka
-
-
-@dataclass(frozen=True)
-class Run:
-    tekst: str
-    font: Efektivno[str | None]
-    velicina: Efektivno[int]
-    podebljano: Efektivno[bool]
+    # w:titlePg: drukčija prva stranica (Different First Page).
+    prva_stranica: bool = False
+    # Podnožja po vrsti, s nasljeđivanjem od prethodne sekcije.
+    podnozja: PodnozjaSekcije = PodnozjaSekcije()
 
 
 @dataclass(frozen=True)
@@ -132,13 +141,15 @@ class DocModel:
     sekcije: tuple[Sekcija, ...] = ()
     zrcalne_margine: bool = False
     odlomci: tuple[Odlomak, ...] = ()
+    # w:evenAndOddHeaders u postavkama: drukčije parne i neparne stranice.
+    parna_neparna: bool = False
 
 
 def _twips(duljina: int | None) -> int | None:
     return None if duljina is None else round(duljina / _EMU_PO_TWIPU)
 
 
-def _sekcija(indeks: int, uloga: Uloga, s) -> Sekcija:
+def _sekcija(indeks: int, uloga: Uloga, s, podnozja: PodnozjaSekcije = PodnozjaSekcije()) -> Sekcija:
     sirina, visina = _twips(s.page_width), _twips(s.page_height)
     # Word raspoređuje stranicu po dimenzijama; w:orient vrijedi samo kad dimenzije nedostaju.
     if sirina is not None and visina is not None:
@@ -157,6 +168,8 @@ def _sekcija(indeks: int, uloga: Uloga, s) -> Sekcija:
         visina=visina,
         pejzazno=pejzazno,
         pocetak=_POCETAK.get(s.start_type, TipPocetka.SLJEDECA_STRANICA),
+        prva_stranica=je_istina(s._sectPr.find(qn("w:titlePg"))),
+        podnozja=podnozja,
     )
 
 
@@ -165,6 +178,16 @@ def _zrcalne_margine(dokument) -> bool:
     if element is None:
         return False
     return element.get(qn("w:val"), "true").lower() not in ("false", "0", "off")
+
+
+def _parna_neparna(dokument) -> bool:
+    # Ne preko dokument.settings: python-docx bi dokumentu bez postavki dodao dio paketa.
+    dio = _dio(dokument, RT.SETTINGS)
+    if dio is None:
+        return False
+    element = getattr(dio, "element", None)
+    element = element if element is not None else parse_xml(dio.blob)
+    return je_istina(element.find(qn("w:evenAndOddHeaders")))
 
 
 # --- odlomci -------------------------------------------------------------------
@@ -313,8 +336,7 @@ def _numeracije(sirovi: list[_Sirovi], brojaci: Brojaci) -> list[Efektivno[Numer
     ]
 
 
-def _odlomci(dokument, uloge_sek: tuple[Uloga, ...], nazivi: NaziviUloga) -> tuple[Odlomak, ...]:
-    stilovi = _stilovi(dokument)
+def _odlomci(dokument, uloge_sek: tuple[Uloga, ...], nazivi: NaziviUloga, stilovi: Stilovi) -> tuple[Odlomak, ...]:
     tijelo = dokument.element.body
     zadnja = max(len(uloge_sek), 1)
     sirovi, sekcija = [], 1
@@ -377,10 +399,13 @@ def procitaj(sadrzaj: bytes, nazivi: NaziviUloga) -> DocModel:
         raise NeispravanDokument(type(greska).__name__) from greska
     sekcije = list(dokument.sections)
     uloge = uloge_sekcija(len(sekcije))
+    stilovi = _stilovi(dokument)
+    podnozja = podnozja_sekcija(dokument.part, [s._sectPr for s in sekcije], stilovi)
     return DocModel(
         sekcije=tuple(
-            _sekcija(i + 1, uloga, s) for i, (uloga, s) in enumerate(zip(uloge, sekcije))
+            _sekcija(i + 1, uloga, s, p) for i, (uloga, s, p) in enumerate(zip(uloge, sekcije, podnozja))
         ),
         zrcalne_margine=_zrcalne_margine(dokument),
-        odlomci=_odlomci(dokument, uloge, nazivi),
+        odlomci=_odlomci(dokument, uloge, nazivi, stilovi),
+        parna_neparna=_parna_neparna(dokument),
     )

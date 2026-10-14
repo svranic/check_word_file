@@ -41,6 +41,7 @@ def test_verzija_ne_ovisi_o_redoslijedu_ni_komentarima():
         "[pravila.R-SAZETAK]\ntolerancija = \"0,03 cm\"\nuvlaka_desno = \"3,5 cm\"\n"
         "uvlaka_lijevo = \"3,5 cm\"\nporavnanje = \"obostrano\"\nvelicina = \"12 pt\"\n"
         "font = \"Calibri\"\nukljuceno = true\n"
+        "[pravila.R-BROJ-STRANICE]\nvelicina = \"10 pt\"\nfont = \"Calibri\"\nukljuceno = true\n"
         "[uloge]\npoglavlja = [\"Uvod\", \"Studij geodezije i geomatike u Varaždinu\", "
         "\"Zaključak\", \"Literatura\"]\nliteratura = \"Literatura\"\nsazetak = \"Sažetak\"\n"
     )

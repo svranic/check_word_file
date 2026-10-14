@@ -69,6 +69,14 @@ class Efektivno(Generic[T]):
 
 
 @dataclass(frozen=True)
+class Run:
+    tekst: str
+    font: Efektivno[str | None]
+    velicina: Efektivno[int]
+    podebljano: Efektivno[bool]
+
+
+@dataclass(frozen=True)
 class Stil:
     kanonski_id: str
     ime: str

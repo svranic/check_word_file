@@ -97,3 +97,10 @@ velicina = "12 pt"
 [pravila.R-STILOVI]
 # Osnovni tekst i naslovi bez ručnog oblikovanja; ciljnih vrijednosti nema.
 ukljuceno = true
+
+[pravila.R-BROJ-STRANICE]
+ukljuceno = true
+# Wordovo polje broja stranice (Umetanje (Insert) → Broj stranice (Page Number)) u podnožju
+# svake sekcije rada; naslovnica nema broj. Provjerava se font i veličina samog broja.
+font = "Calibri"
+velicina = "10 pt"

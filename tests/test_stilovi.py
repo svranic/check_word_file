@@ -284,7 +284,9 @@ def test_profil_ima_samo_ukljuceno():
 
 
 def test_pravilo_se_moze_iskljuciti():
-    tekst = TOML.split("[pravila.R-STILOVI]")[0] + "[pravila.R-STILOVI]\nukljuceno = false\n"
+    pocetak = TOML.index("[pravila.R-STILOVI]")
+    kraj = TOML.find("\n[", pocetak)
+    tekst = TOML[:pocetak] + "[pravila.R-STILOVI]\nukljuceno = false\n" + (TOML[kraj:] if kraj != -1 else "")
     iskljuceno = profil.ucitaj(tekst.encode("utf-8"))
     izvjestaj = provjeri(VARIJANTE["stilovi_font"](54, PROFIL), iskljuceno, KONTEKST)
     assert not [n for n in izvjestaj.nalazi if n.pravilo_id == ID]

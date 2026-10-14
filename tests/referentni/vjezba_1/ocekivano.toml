@@ -99,3 +99,24 @@ padaju = ["R-STILOVI"]
 
 [primjeri.stilovi_podebljano]
 padaju = []
+
+[primjeri.broj_rucni]
+padaju = ["R-BROJ-STRANICE"]
+
+[primjeri.broj_nema]
+padaju = ["R-BROJ-STRANICE"]
+
+[primjeri.broj_naslovnica]
+padaju = ["R-BROJ-STRANICE"]
+
+[primjeri.broj_prva_stranica]
+padaju = ["R-BROJ-STRANICE"]
+
+[primjeri.broj_font]
+padaju = ["R-BROJ-STRANICE"]
+
+[primjeri.broj_galerija]
+padaju = []
+
+[primjeri.broj_okvir]
+padaju = []

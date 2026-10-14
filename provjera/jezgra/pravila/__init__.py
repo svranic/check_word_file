@@ -9,6 +9,7 @@ from provjera.jezgra.pravila import r_naslovi  # noqa: F401
 from provjera.jezgra.pravila import r_sazetak  # noqa: F401
 from provjera.jezgra.pravila import r_literatura  # noqa: F401
 from provjera.jezgra.pravila import r_stilovi  # noqa: F401
+from provjera.jezgra.pravila import r_broj_stranice  # noqa: F401
 # isort: on
 from provjera.jezgra.pravila.osnova import REGISTAR, PostavkeBaza, Pravilo
 

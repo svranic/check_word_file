@@ -5,10 +5,10 @@ R-NASLOVI, R-SAZETAK i R-LITERATURA dijele ovu funkciju. Svaki pozivatelj predaj
 ``pravilo_id``, pa ključevi poruka ostaju ``<ID>.font``, ``<ID>.velicina`` itd.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 from provjera.jezgra.jedinice import Jedinica, unutar_tolerancije
-from provjera.jezgra.model import Efektivno, Odlomak
+from provjera.jezgra.model import Efektivno, Odlomak, Run
 from provjera.jezgra.nalaz import Dio, Lokacija, Nalaz, Parametar, Status, Vrijednost, VrstaIzvora
 
 _TOLERANCIJA = 0
@@ -21,8 +21,14 @@ def lokacija_odlomka(o: Odlomak) -> Lokacija:
 def nalaz_odlomka(o: Odlomak, pravilo_id: str, kljuc: str, parametri: Mapping[str, Parametar],
                   ocekivano: Vrijednost | None = None, pronadeno: Vrijednost | None = None,
                   efektivno: Efektivno | None = None, status: Status = Status.NE_PROLAZI) -> Nalaz:
+    return nalaz_na(lokacija_odlomka(o), pravilo_id, kljuc, parametri, ocekivano, pronadeno, efektivno, status)
+
+
+def nalaz_na(lokacija: Lokacija, pravilo_id: str, kljuc: str, parametri: Mapping[str, Parametar],
+             ocekivano: Vrijednost | None = None, pronadeno: Vrijednost | None = None,
+             efektivno: Efektivno | None = None, status: Status = Status.NE_PROLAZI) -> Nalaz:
     return Nalaz(
-        pravilo_id, status, lokacija_odlomka(o), f"{pravilo_id}.{kljuc}",
+        pravilo_id, status, lokacija, f"{pravilo_id}.{kljuc}",
         ocekivano=ocekivano,
         pronadeno=pronadeno,
         izvor=efektivno.izvor if efektivno is not None else None,
@@ -37,14 +43,20 @@ def nalazi_runova(o: Odlomak, pravilo_id: str, font: str, velicina: int,
     Font bez vrijednosti (tema nije zapisana) daje ``font_nepoznat`` (neprovjerljivo), a
     font iz teme ``font_tema``. ``podebljano=None`` znači da se podebljanje ne provjerava.
     """
+    return nalazi_runova_na(o.runovi, lokacija_odlomka(o), pravilo_id, font, velicina, parametri, podebljano)
+
+
+def nalazi_runova_na(runovi: Iterable[Run], lokacija: Lokacija, pravilo_id: str, font: str, velicina: int,
+                     parametri: Mapping[str, Parametar], podebljano: bool | None = None) -> list[Nalaz]:
+    """Kao ``nalazi_runova``, za runove bilo kojeg dijela (npr. podnožja) s danom lokacijom."""
     nalazi: dict[tuple, Nalaz] = {}
 
     def dodaj(kljuc: str, ocekivano: Vrijednost, pronadeno: Vrijednost | None, efektivno: Efektivno,
               status: Status = Status.NE_PROLAZI) -> None:
-        nalaz = nalaz_odlomka(o, pravilo_id, kljuc, parametri, ocekivano, pronadeno, efektivno, status)
+        nalaz = nalaz_na(lokacija, pravilo_id, kljuc, parametri, ocekivano, pronadeno, efektivno, status)
         nalazi.setdefault((nalaz.poruka_kljuc, nalaz.pronadeno, nalaz.izvor), nalaz)
 
-    for run in o.runovi:
+    for run in runovi:
         if not run.tekst.strip():
             continue
         if run.font.vrijednost is None:
