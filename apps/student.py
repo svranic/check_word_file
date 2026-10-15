@@ -19,7 +19,7 @@ from provjera.jezgra.poruke import (
     poruka,
     tekst_nalaza,
 )
-from provjera.jezgra.provjera import provjeri, spremnost
+from provjera.jezgra.provjera import NAJVISE_PRIMJERA, provjeri, spremnost
 from provjera.jezgra.sazetak import html_sazetka
 
 MAPA_PROFILA = Path(__file__).resolve().parents[1] / "profili"
@@ -131,7 +131,8 @@ def prikazi_nalaz(nalaz: Nalaz) -> None:
             lokacije = list(dict.fromkeys(nalaz.primjeri))
             if len(lokacije) >= 2:
                 primjeri = "; ".join(opis_lokacije(lokacija) for lokacija in lokacije)
-                if nalaz.pojave > len(lokacije):
+                # Skrivenih lokacija može biti samo kad je popis primjera pun.
+                if len(lokacije) >= NAJVISE_PRIMJERA and nalaz.pojave > len(lokacije):
                     primjeri += "; …"
                 st.caption(bez_markdowna(poruka("izvjestaj.primjeri", primjeri=primjeri)))
         if nalaz.izvor is not None:

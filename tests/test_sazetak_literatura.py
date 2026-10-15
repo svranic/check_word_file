@@ -267,3 +267,12 @@ def test_svi_kljucevi_imaju_poruku():
     for pravilo_id in (SAZETAK, LITERATURA):
         assert f"pravilo.{pravilo_id}" in KATALOG
         assert all(k in KATALOG for k in REGISTAR[pravilo_id].poruke)
+
+
+def test_poravnanje_ostalo_nije_dopusteno_u_sazetku():
+    pocetak = TOML.index("[pravila.R-SAZETAK]")
+    kraj = TOML.find("\n[", pocetak + 1)
+    odjeljak = TOML[pocetak:kraj].replace('poravnanje = "obostrano"', 'poravnanje = "ostalo"')
+    assert 'poravnanje = "ostalo"' in odjeljak
+    with pytest.raises(profil.GreskaProfila):
+        profil.ucitaj((TOML[:pocetak] + odjeljak + TOML[kraj:]).encode("utf-8"))

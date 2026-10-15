@@ -104,7 +104,18 @@ def _je_istina(element, atribut: str = "w:val") -> bool:
 
 def _cijeli(element, atribut: str) -> int | None:
     vrijednost = element.get(qn(atribut))
-    return None if vrijednost is None else int(vrijednost)
+    if vrijednost is None:
+        return None
+    try:
+        return int(vrijednost)
+    except ValueError:
+        pass
+    # Neki generatori pišu decimalni broj („240.0“); mjeru s jedinicom („12pt“) ne
+    # tumačimo, nego je smatramo nezapisanom, da jedan atribut ne sruši cijeli model.
+    try:
+        return round(float(vrijednost))
+    except ValueError:
+        return None
 
 
 def iz_ppr(ppr) -> dict[str, Any]:

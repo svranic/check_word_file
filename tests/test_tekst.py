@@ -525,3 +525,71 @@ def test_stil_iz_profila_s_razmakom_odgovara_kanonskom_id():
     body = PROFIL.model_copy(update={"pravila": {**PROFIL.pravila, "R-TEKST": tekst}})
     nalazi = [n for n in provjeri(_izmijeni(body_text), body, KONTEKST).nalazi if n.pravilo_id == "R-TEKST"]
     assert "R-TEKST.drugi_stil" not in {n.poruka_kljuc for n in nalazi}
+
+
+def _odlomak_uvoda(m):
+    return next(o for o in m.odlomci if o.tekst.startswith("Ovo je osnovni tekst poglavlja Uvod"))
+
+
+def _razmak_u_ppr(atributi: str):
+    def promjena(d):
+        odlomak = next(o for o in d.paragraphs if o.text.startswith("Ovo je osnovni tekst poglavlja Uvod"))
+        odlomak._p.get_or_add_pPr().append(parse_xml(f"<w:spacing {nsdecls('w')} {atributi}/>"))
+
+    return promjena
+
+
+def test_automatski_razmak_ima_prednost_i_iznosi_14_pt():
+    m = model.procitaj(_izmijeni(_razmak_u_ppr('w:beforeAutospacing="1" w:before="100"')), PROFIL.uloge)
+    assert _odlomak_uvoda(m).razmak_ispred.vrijednost == 280
+    nalazi = provjeri(_izmijeni(_razmak_u_ppr('w:beforeAutospacing="1" w:before="100"')), PROFIL, KONTEKST)
+    tekstovi = [tekst_nalaza(n) for n in nalazi.nalazi if n.poruka_kljuc == "R-TEKST.razmak_ispred"]
+    assert tekstovi and "14 pt" in tekstovi[0]
+
+
+def test_decimalni_atribut_ne_rusi_model():
+    m = model.procitaj(_izmijeni(_razmak_u_ppr('w:before="120.0"')), PROFIL.uloge)
+    assert _odlomak_uvoda(m).razmak_ispred.vrijednost == 120
+
+
+def test_mjera_s_jedinicom_ne_rusi_model_ni_sekcije():
+    sadrzaj = _izmijeni(_razmak_u_ppr('w:before="12pt"'))
+    izvjestaj = provjeri(sadrzaj, PROFIL, KONTEKST)
+    assert status_pravila(izvjestaj.nalazi, "R-SEKCIJE") is Status.PROSLO
+    assert status_pravila(izvjestaj.nalazi, "R-MARGINE") is Status.PROSLO
+
+
+def test_dokument_bez_dijela_stilova_koristi_wordove_zadane_vrijednosti():
+    def bez_veze(xml: bytes) -> bytes:
+        return re.sub(rb"<Relationship [^>]*/styles\"[^>]*/>", b"", xml)
+
+    sadrzaj = zamijeni_u_zipu(ispravan(54, PROFIL), {
+        "word/styles.xml": lambda _: None,
+        "word/_rels/document.xml.rels": bez_veze,
+    })
+    m = model.procitaj(sadrzaj, PROFIL.uloge)
+    o = _odlomak_uvoda(m)
+    assert o.stil.kanonski_id == "Normal"
+    assert o.poravnanje.vrijednost is Poravnanje.LIJEVO
+    assert o.poravnanje.izvor.vrsta is VrstaIzvora.ZADANO
+    assert o.razmak_iza.vrijednost == 0
+
+
+@pytest.mark.parametrize("num_id", ["77"])
+def test_viseci_num_id_nije_popis(num_id):
+    def numeracija(d):
+        odlomak = next(o for o in d.paragraphs if o.text.startswith("Ovo je osnovni tekst poglavlja Uvod"))
+        _numeriraj(odlomak, num_id)
+
+    o = _odlomak_uvoda(model.procitaj(_izmijeni(numeracija), PROFIL.uloge))
+    assert o.numeracija.vrijednost is None
+    assert o.uloga is UlogaOdlomka.OSNOVNI_TEKST
+
+
+def test_isjecak_bez_tabulatora_i_prijeloma():
+    def promjena(d):
+        odlomak = next(o for o in d.paragraphs if o.text.startswith("Ovo je osnovni tekst poglavlja Uvod"))
+        odlomak.runs[0].text = "Prvi\tdrugi\nTreći"
+
+    o = next(o for o in model.procitaj(_izmijeni(promjena), PROFIL.uloge).odlomci if o.tekst.startswith("Prvi"))
+    assert o.isjecak.startswith("Prvi drugi Treći")

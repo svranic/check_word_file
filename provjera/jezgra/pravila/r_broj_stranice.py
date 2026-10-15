@@ -59,7 +59,12 @@ _RUCNI_BROJ = re.compile(
 
 
 def _ima_rucni_broj(podnozje: Podnozje) -> bool:
-    return any(_RUCNI_BROJ.fullmatch(odlomak) for odlomak in podnozje.odlomci_izvan_polja)
+    # Broj je često odvojen tabulatorom od drugog teksta („Ana Horvat\t\t2“).
+    return any(
+        _RUCNI_BROJ.fullmatch(dio)
+        for odlomak in podnozje.odlomci_izvan_polja
+        for dio in (odlomak, *re.split(r"\t+", odlomak))
+    )
 
 
 def _vrste_tijela(sekcija: Sekcija, model: DocModel) -> list[VrstaPodnozja]:

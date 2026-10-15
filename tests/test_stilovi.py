@@ -290,3 +290,22 @@ def test_pravilo_se_moze_iskljuciti():
     iskljuceno = profil.ucitaj(tekst.encode("utf-8"))
     izvjestaj = provjeri(VARIJANTE["stilovi_font"](54, PROFIL), iskljuceno, KONTEKST)
     assert not [n for n in izvjestaj.nalazi if n.pravilo_id == ID]
+
+
+def test_font_teme_na_runu_s_krivim_fontom_daje_font_a_ne_font_tema():
+    sadrzaj = zamijeni_u_zipu(_izmijeni(_font_teme_na_runu), {"word/theme/theme1.xml": tema_s_fontom("Aptos")})
+    nalazi = [n for n in provjeri(sadrzaj, PROFIL, KONTEKST).nalazi if n.pravilo_id == "R-TEKST"]
+    fontovi = [n for n in nalazi if n.poruka_kljuc in ("R-TEKST.font", "R-TEKST.font_tema")]
+    assert [(n.poruka_kljuc, n.pronadeno.iznos, n.izvor.vrsta) for n in fontovi] == [
+        ("R-TEKST.font", "Aptos", VrstaIzvora.IZRAVNO)
+    ]
+
+
+def test_isti_font_drukcijim_slovima_je_jedan_nalaz():
+    def promjena(d):
+        odlomak = _osnovni(d)[0]
+        odlomak.runs[0].font.name = "Arial"
+        odlomak.add_run(" još teksta").font.name = "arial"
+
+    [nalaz] = [n for n in _nalazi(_izmijeni(promjena)) if n.poruka_kljuc == f"{ID}.izravni_font"]
+    assert nalaz.pojave == 1

@@ -501,3 +501,55 @@ def test_stvarni_uzorak_prepoznaje_polje_iz_galerije():
     statusi = {n.status for n in provjeri(sadrzaj, PROFIL, KontekstProvjere(UZORAK.name, 54, None, None)).nalazi
                if n.pravilo_id == ID}
     assert Status.NEPROVJERLJIVO not in statusi
+
+
+def _podnozje_tijela_s_tekstom(tekst: str):
+    def promjena(d):
+        _isprazni(d.sections[1].footer).add_run(tekst)
+
+    return promjena
+
+
+def test_rucni_broj_uz_tekst_odvojen_tabulatorom():
+    assert _kljucevi(_izmijeni(_podnozje_tijela_s_tekstom("Ana Horvat\t\t2"))) == {"rucni_broj"}
+
+
+def test_rucni_broj_iza_pozicijskog_tabulatora():
+    def promjena(d):
+        odlomak = _isprazni(d.sections[1].footer)
+        odlomak._p.append(parse_xml(
+            f'<w:r {nsdecls("w")}><w:t>Ana Horvat</w:t>'
+            '<w:ptab w:relativeTo="margin" w:alignment="right" w:leader="none"/><w:t>2</w:t></w:r>'
+        ))
+
+    assert _kljucevi(_izmijeni(promjena)) == {"rucni_broj"}
+
+
+@pytest.mark.parametrize(
+    ("vrijednost", "ukljuceno"),
+    [(None, True), ("1", True), ("true", True), ("on", True), ("0", False), ("false", False), ("off", False)],
+)
+def test_prva_stranica_i_parne_prema_vrijednosti(vrijednost, ukljuceno):
+    atribut = "" if vrijednost is None else f' w:val="{vrijednost}"'
+
+    def promjena(d):
+        d.sections[1]._sectPr.append(parse_xml(f'<w:titlePg {nsdecls("w")}{atribut}/>'))
+        d.settings.element.append(parse_xml(f'<w:evenAndOddHeaders {nsdecls("w")}{atribut}/>'))
+
+    m = _model(_izmijeni(promjena))
+    assert m.sekcije[1].prva_stranica is ukljuceno
+    assert m.parna_neparna is ukljuceno
+
+
+def test_necitljivo_podnozje_je_ostecena_datoteka():
+    import zipfile
+
+    sadrzaj = ispravan(54, PROFIL)
+    with zipfile.ZipFile(io.BytesIO(sadrzaj)) as arhiva:
+        podnozja = [i for i in arhiva.namelist() if re.fullmatch(r"word/footer\d+\.xml", i)]
+    assert podnozja
+    pokvaren = zamijeni_u_zipu(sadrzaj, {ime: lambda _x: b"<smece" for ime in podnozja})
+    # python-docx parsira XML dijelove pri otvaranju: pokvareno podnožje je oštećena datoteka.
+    from provjera.jezgra.ulaz import RazlogOdbijanja
+
+    assert provjeri(pokvaren, PROFIL, KONTEKST).odbijeno is RazlogOdbijanja.OSTECENA

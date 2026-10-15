@@ -25,6 +25,7 @@ _PRESKOCI = {qn(t) for t in ("w:pPr", "w:rPr", "w:sdtPr", "w:del", "w:moveFrom",
 _TEKST_RUNA = {
     qn("w:t"): None,
     qn("w:tab"): "\t",
+    qn("w:ptab"): "\t",  # pozicijski tabulator koji Word umeće u podnožja
     qn("w:br"): "\n",
     qn("w:cr"): "\n",
     qn("w:noBreakHyphen"): "-",
@@ -227,8 +228,14 @@ def procitaj_podnozje(korijen, stilovi: Stilovi, dio: str | None = None) -> Podn
 
 
 def _korijen_dijela(dio):
+    """Korijen dijela; ``None`` ako se XML ne može parsirati."""
     element = getattr(dio, "element", None)
-    return element if element is not None else parse_xml(dio.blob)
+    if element is not None:
+        return element
+    try:
+        return parse_xml(dio.blob)
+    except Exception:  # noqa: BLE001 — nečitljivo podnožje ne smije srušiti cijeli model
+        return None
 
 
 def _reference(sectpr) -> dict[VrstaPodnozja, str]:
@@ -254,7 +261,8 @@ def podnozja_sekcija(dokument_dio, sectpr_sekcija: list, stilovi: Stilovi) -> li
         if r_id not in procitana:
             dio = dokument_dio.related_parts.get(r_id)
             procitana[r_id] = (
-                PRAZNO if dio is None else procitaj_podnozje(_korijen_dijela(dio), stilovi, str(dio.partname))
+                PRAZNO if (korijen := None if dio is None else _korijen_dijela(dio)) is None
+                else procitaj_podnozje(korijen, stilovi, str(dio.partname))
             )
         return procitana[r_id]
 

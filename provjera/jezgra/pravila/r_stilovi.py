@@ -43,7 +43,9 @@ def _odlomak(o: Odlomak) -> list[Nalaz]:
 
     def dodaj(kljuc: str, pronadeno: Vrijednost | None, efektivno: Efektivno, strana: str | None = None) -> None:
         parametri = {"strana": strana} if strana else {}
-        nalazi.setdefault((kljuc, pronadeno, strana),
+        # Isti font napisan drukčijim slovima („Calibri“, „calibri“) je jedan nalaz.
+        kljuc_iznosa = pronadeno.iznos.casefold() if pronadeno and isinstance(pronadeno.iznos, str) else pronadeno
+        nalazi.setdefault((kljuc, kljuc_iznosa, strana),
                           nalaz_odlomka(o, ID, kljuc, parametri, None, pronadeno, efektivno))
 
     if _izravno(o.poravnanje):

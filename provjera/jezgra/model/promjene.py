@@ -68,7 +68,11 @@ def pracene_promjene(dokument) -> int:
         if str(dio.partname) in vidjeni:
             continue
         vidjeni.add(str(dio.partname))
-        ukupno += _broj(_korijen(dio))
+        try:
+            korijen = _korijen(dio)
+        except Exception:  # noqa: BLE001 — nečitljiv dio ne smije srušiti cijeli model
+            continue
+        ukupno += _broj(korijen)
     return ukupno
 
 

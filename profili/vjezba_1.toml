@@ -113,6 +113,6 @@ velicina = "10 pt"
 ukljuceno = true
 
 [pravila.R-OKVIRI]
-# Naslovi poglavlja i osnovni tekst (barem 40 znakova) ne smiju biti u tekstnim okvirima
-# ni oblicima u tijelu rada; kratke oznake su dopuštene, naslovnica se ne provjerava.
+# Naslovi poglavlja i osnovni tekst (barem 40 znakova; granica je fiksna u kodu) ne smiju biti
+# u tekstnim okvirima ni oblicima u tijelu rada; kratke oznake su dopuštene, naslovnica se ne provjerava.
 ukljuceno = true

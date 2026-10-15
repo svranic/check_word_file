@@ -10,7 +10,7 @@ from provjera.jezgra.pravila import REGISTAR
 from provjera.jezgra.profil import Profil, verzija
 from provjera.jezgra.ulaz import RazlogOdbijanja
 
-_NAJVISE_PRIMJERA = 3
+NAJVISE_PRIMJERA = 3
 _POREDAK = {Status.PROSLO: 0, Status.NE_PROLAZI: 1, Status.NEPROVJERLJIVO: 2}
 
 
@@ -39,7 +39,7 @@ def _prikaziv(nalaz: Nalaz) -> bool:
 def _sazmi(nalazi: list[Nalaz]) -> list[Nalaz]:
     """Spaja ponavljanja istog nalaza u jedan, uz prvu lokaciju, zbroj pojava i primjere.
 
-    ``primjeri`` sadrže do ``_NAJVISE_PRIMJERA`` različitih lokacija spojenih nalaza,
+    ``primjeri`` sadrže do ``NAJVISE_PRIMJERA`` različitih lokacija spojenih nalaza,
     uključujući prvu; nalaz bez ponavljanja ostaje nepromijenjen.
     """
     grupe: dict[tuple, Nalaz] = {}
@@ -52,7 +52,7 @@ def _sazmi(nalazi: list[Nalaz]) -> list[Nalaz]:
             prvi = grupe[kljuc]
             primjeri = list(prvi.primjeri or (prvi.lokacija,))
             for lokacija in n.primjeri or (n.lokacija,):
-                if len(primjeri) < _NAJVISE_PRIMJERA and lokacija not in primjeri:
+                if len(primjeri) < NAJVISE_PRIMJERA and lokacija not in primjeri:
                     primjeri.append(lokacija)
             grupe[kljuc] = replace(prvi, pojave=prvi.pojave + n.pojave, primjeri=tuple(primjeri))
         else:

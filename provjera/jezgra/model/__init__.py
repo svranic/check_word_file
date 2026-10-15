@@ -203,10 +203,7 @@ def _apsolutno(twips: int | None) -> int | None:
 
 
 def _zrcalne_margine(dokument) -> bool:
-    element = dokument.settings.element.find(qn("w:mirrorMargins"))
-    if element is None:
-        return False
-    return element.get(qn("w:val"), "true").lower() not in ("false", "0", "off")
+    return je_istina(dokument.settings.element.find(qn("w:mirrorMargins")))
 
 
 def _parna_neparna(dokument) -> bool:
@@ -346,12 +343,22 @@ def _stilovi(dokument) -> Stilovi:
     return Stilovi(dio_stilova.element if dio_stilova is not None else None, tema)
 
 
+def _isjecak(tekst: str) -> str | None:
+    """Isječak za prikaz: tabulatori i prijelomi retka postaju razmaci."""
+    return " ".join(tekst.split())[:_NAJVECI_ISJECAK] or None
+
+
 def _brojaci(dokument) -> Brojaci:
     dio = _dio(dokument, RT.NUMBERING)
     if dio is None:
         return Brojaci(None)
     element = getattr(dio, "element", None)
-    return Brojaci(element if element is not None else parse_xml(dio.blob))
+    if element is None:
+        try:
+            element = parse_xml(dio.blob)
+        except Exception:  # noqa: BLE001 — nečitljiva numeracija ne smije srušiti cijeli model
+            return Brojaci(None)
+    return Brojaci(element)
 
 
 def _numeracije(sirovi: list[_Sirovi], brojaci: Brojaci) -> list[Efektivno[Numeracija | None]]:
@@ -382,7 +389,7 @@ def _okviri(p, sekcija: int, stilovi: Stilovi, nazivi: NaziviUloga) -> Iterator[
         yield OdlomakOkvira(
             sekcija=sekcija,
             tekst=s.tekst,
-            isjecak=s.tekst.strip()[:_NAJVECI_ISJECAK] or None,
+            isjecak=_isjecak(s.tekst),
             kanonski_stil=kanonski,
             uloga=uloga_okvira(kanonski, s.tekst, nazivi),
         )
@@ -405,6 +412,9 @@ def _odlomci(
         # Sekciju završava odlomak tijela s w:sectPr (kao dokument.sections u python-docx).
         if p.getparent() is tijelo and p.find(f"{qn('w:pPr')}/{qn('w:sectPr')}") is not None:
             sekcija += 1
+    # Uloga koristi isti razrješavač numeracije kao pravila: viseći numId ili
+    # razina bez broja (numFmt="none") nije popis.
+    numeracije = _numeracije(sirovi, _brojaci(dokument))
     znacajke = [
         ZnacajkeOdlomka(
             uloga_sekcije=uloge_sek[s.sekcija - 1] if uloge_sek else Uloga.TIJELO,
@@ -413,19 +423,18 @@ def _odlomci(
             u_tablici=s.u_tablici,
             u_sadrzaju=s.u_sadrzaju,
             ima_sliku=s.ima_sliku,
-            numeriran=bool(s.svojstva["numeriran"].vrijednost),
+            numeriran=numeracija.vrijednost is not None,
         )
-        for s in sirovi
+        for s, numeracija in zip(sirovi, numeracije)
     ]
     uloge = uloge_odlomaka(znacajke, nazivi)
-    numeracije = _numeracije(sirovi, _brojaci(dokument))
     odlomci = tuple(
         Odlomak(
             indeks=i + 1,
             sekcija=s.sekcija,
             stil=stilovi.stil(s.stil_id),
             tekst=s.tekst,
-            isjecak=s.tekst.strip()[:_NAJVECI_ISJECAK] or None,
+            isjecak=_isjecak(s.tekst),
             uloga=uloga,
             u_tablici=s.u_tablici,
             poravnanje=s.svojstva["poravnanje"],
