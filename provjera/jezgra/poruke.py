@@ -5,7 +5,7 @@ a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefik
 ``app.``, ``nastavnik.``, ``popis.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
 ``margine.``, ``naziv.``, ``ulaz.``, ``opce.``, ``status.``, ``izvjestaj.``,
 ``lokacija.``, ``izvor.``, ``sazetak.``, ``poravnanje.``, ``prored.``, ``spremnost.``,
-``samoprovjera.``, ``pdf.`` i ``vrijednost.``.
+``samoprovjera.``, ``pdf.``, ``batch.``, ``ukupni_status.`` i ``vrijednost.``.
 """
 
 from collections.abc import Mapping
@@ -823,6 +823,71 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Ovo pravilo nije bilo moguće pouzdano provjeriti ({razlog}). "
             "Pitaj nastavnika da pregleda ovaj dio rada."
         ),
+        "batch.naslov": "Batch provjera predaja",
+        "batch.opis": (
+            "Provjerava sve predane radove u mapi i podmapama istim pravilima kao web "
+            "provjera, uz točan naziv prema zamrznutom popisu. Ništa se ne šalje na mrežu "
+            "i ništa se u mapi predaja ne mijenja."
+        ),
+        "batch.mapa": "Mapa s predanim radovima",
+        "batch.mapa_pomoc": (
+            "Mapa preuzeta iz e-učenja. Wordove privremene (~$…), skrivene i sistemske "
+            "datoteke se preskaču."
+        ),
+        "batch.mapa_prazna": "Upiši putanju mape s predanim radovima.",
+        "batch.mapa_neispravna": "Mapa predaja mora biti apsolutna putanja postojeće mape.",
+        "batch.mapa_u_podacima": (
+            "Mapa predaja ne smije biti podatkovna mapa ni mapa unutar nje. Odaberi mapu "
+            "s preuzetim radovima."
+        ),
+        "batch.mapa_necitljiva": "Mapa predaja (ili neka podmapa) nije čitljiva: {razlog}",
+        "batch.nije_moguce": "Batch provjera nije moguća – problemi: {broj}",
+        "batch.otisak_RAZLICIT": (
+            "Margine trenutnog profila razlikuju se od onih u objavljenom PDF-u sa "
+            "svojstvima. Studenti su možda oblikovali radove prema drugim marginama."
+        ),
+        "batch.otisak_NEMA_IZDANOG": (
+            "PDF sa svojstvima za ovu vježbu još nije generiran, pa se ne može potvrditi da "
+            "su margine iste kao objavljene."
+        ),
+        "batch.otisak_NECITLJIVO": (
+            "Zapis o izdanom PDF-u (izdano.json) nije čitljiv, pa se ne može potvrditi da "
+            "su margine iste kao objavljene."
+        ),
+        "batch.potvrda_otiska": "Razumijem i želim pokrenuti provjeru s trenutnim marginama.",
+        "batch.pokreni": "Pokreni batch provjeru",
+        "batch.u_tijeku": "Provjeravam datoteku {obradeno} od {ukupno} …",
+        "batch.gotovo": "Provjereno datoteka: {broj}.",
+        "batch.nema_datoteka": "U mapi predaja nema datoteka za provjeru.",
+        "batch.stupac_datoteka": "Datoteka",
+        "batch.stupac_student": "Student",
+        "batch.stupac_status": "Status",
+        "batch.stupac_razlog": "Razlog",
+        "batch.student": "{rbr}. {ime} {prezime}",
+        "batch.nepovezano": "datoteka nije povezana ni s jednim studentom",
+        "batch.razlog_iznimka": "neočekivana greška pri obradi ({greska})",
+        "batch.odbijeno.prazna": "datoteka je prazna",
+        "batch.odbijeno.neispravan_format": "datoteka nije .docx",
+        "batch.odbijeno.stari_doc": "stari Wordov format .doc",
+        "batch.odbijeno.makro": "dokument s makronaredbama (.docm)",
+        "batch.odbijeno.sifrirana": "dokument je zaštićen lozinkom",
+        "batch.odbijeno.prevelika": "datoteka je veća od dopuštene",
+        "batch.odbijeno.zip_bomba": "raspakirani sadržaj je prevelik",
+        "batch.odbijeno.ostecena": "datoteka je oštećena",
+        "ukupni_status.SPREMNO": "spremno",
+        "ukupni_status.NIJE_SPREMNO": "nije spremno",
+        "ukupni_status.ZA_RUCNI_PREGLED": "za ručni pregled",
+        "ukupni_status.NIJE_PREDAO": "nije predao",
+        "ukupni_status.NEISPRAVAN_FORMAT": "neispravan format",
+        "ukupni_status.NEUSPJELA_OBRADA": "neuspjela obrada",
+        "ukupni_status.NEAKTIVAN": "neaktivan",
+        "ukupni_status.ikona.SPREMNO": "✅",
+        "ukupni_status.ikona.NIJE_SPREMNO": "❌",
+        "ukupni_status.ikona.ZA_RUCNI_PREGLED": "⚠️",
+        "ukupni_status.ikona.NIJE_PREDAO": "➖",
+        "ukupni_status.ikona.NEISPRAVAN_FORMAT": "🚫",
+        "ukupni_status.ikona.NEUSPJELA_OBRADA": "💥",
+        "ukupni_status.ikona.NEAKTIVAN": "⏸️",
         "status.PROSLO": "✅ prošlo",
         "status.NE_PROLAZI": "❌ ne prolazi",
         "status.NEPROVJERLJIVO": "⚠️ neprovjerljivo",

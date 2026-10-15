@@ -198,3 +198,50 @@ def test_greska_modela_ne_rusi_pravila_koja_ga_ne_trebaju(monkeypatch, privremen
 def test_profil_bez_odjeljka_pravila_dobiva_zadane_postavke():
     bez = profil.ucitaj(TOML.replace("[pravila.R-NAZIV]\nukljuceno = true\n", "").encode("utf-8"))
     assert bez.pravila["R-NAZIV"].ukljuceno is True
+
+
+# --- Ukupni status (priča 4.1, AD-5) --------------------------------------------
+
+
+def _izvjestaj(*statusi, odbijeno=None):
+    from provjera.jezgra.nalaz import Izvjestaj
+
+    nalazi = tuple(_nalaz(f"R-{i}", s) for i, s in enumerate(statusi))
+    return Izvjestaj(odbijeno, nalazi, "v", 1)
+
+
+@pytest.mark.parametrize(
+    ("izvjestaj", "ima_datoteku", "aktivan", "ocekivano"),
+    [
+        (None, False, False, "NEAKTIVAN"),
+        (_izvjestaj(Status.PROSLO), True, False, "NEAKTIVAN"),
+        (None, False, True, "NIJE_PREDAO"),
+        (None, True, True, "NEUSPJELA_OBRADA"),
+        (_izvjestaj(odbijeno=RazlogOdbijanja.NEISPRAVAN_FORMAT), True, True, "NEISPRAVAN_FORMAT"),
+        (_izvjestaj(odbijeno=RazlogOdbijanja.STARI_DOC), True, True, "NEISPRAVAN_FORMAT"),
+        (_izvjestaj(odbijeno=RazlogOdbijanja.MAKRO), True, True, "NEISPRAVAN_FORMAT"),
+        (_izvjestaj(odbijeno=RazlogOdbijanja.OSTECENA), True, True, "NEUSPJELA_OBRADA"),
+        (_izvjestaj(odbijeno=RazlogOdbijanja.SIFRIRANA), True, True, "NEUSPJELA_OBRADA"),
+        (_izvjestaj(odbijeno=RazlogOdbijanja.PRAZNA), True, True, "NEUSPJELA_OBRADA"),
+        (_izvjestaj(Status.PROSLO, Status.NEPROVJERLJIVO), True, True, "ZA_RUCNI_PREGLED"),
+        (_izvjestaj(Status.NE_PROLAZI, Status.NEPROVJERLJIVO), True, True, "ZA_RUCNI_PREGLED"),
+        (_izvjestaj(Status.PROSLO, Status.NE_PROLAZI), True, True, "NIJE_SPREMNO"),
+        (_izvjestaj(), True, True, "NIJE_SPREMNO"),
+        (_izvjestaj(Status.PROSLO, Status.PROSLO), True, True, "SPREMNO"),
+    ],
+)
+def test_ukupni_status(izvjestaj, ima_datoteku, aktivan, ocekivano):
+    from provjera.jezgra.provjera import UkupniStatus, ukupni_status
+
+    assert ukupni_status(izvjestaj, ima_datoteku, aktivan) is UkupniStatus[ocekivano]
+
+
+def test_svaki_ukupni_status_ima_ikonu_i_tekst():
+    from provjera.jezgra.poruke import KATALOG
+    from provjera.jezgra.predaje import opis_statusa
+    from provjera.jezgra.provjera import UkupniStatus
+
+    for status in UkupniStatus:
+        assert f"ukupni_status.{status.value}" in KATALOG
+        ikona, _, tekst = opis_statusa(status).partition(" ")
+        assert ikona and not ikona.isalpha() and tekst == opis_statusa(status, ikona=False)

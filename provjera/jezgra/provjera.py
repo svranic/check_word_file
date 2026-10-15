@@ -1,11 +1,13 @@
 """Pokretač provjere (AD-1, AD-4, AD-5): jedina ulazna točka i jedine agregacije."""
 
 from dataclasses import replace
+from enum import Enum
 
 from provjera.jezgra import model, ulaz
 from provjera.jezgra.nalaz import Dio, Izvjestaj, KontekstProvjere, Lokacija, Nalaz, Status
 from provjera.jezgra.pravila import REGISTAR
 from provjera.jezgra.profil import Profil, verzija
+from provjera.jezgra.ulaz import RazlogOdbijanja
 
 _NAJVISE_PRIMJERA = 3
 _POREDAK = {Status.PROSLO: 0, Status.NE_PROLAZI: 1, Status.NEPROVJERLJIVO: 2}
@@ -96,3 +98,36 @@ def spremnost(izvjestaj: Izvjestaj) -> bool:
         and bool(izvjestaj.nalazi)
         and all(n.status is Status.PROSLO for n in izvjestaj.nalazi)
     )
+
+
+class UkupniStatus(Enum):
+    SPREMNO = "SPREMNO"
+    NIJE_SPREMNO = "NIJE_SPREMNO"
+    ZA_RUCNI_PREGLED = "ZA_RUCNI_PREGLED"
+    NIJE_PREDAO = "NIJE_PREDAO"
+    NEISPRAVAN_FORMAT = "NEISPRAVAN_FORMAT"
+    NEUSPJELA_OBRADA = "NEUSPJELA_OBRADA"
+    NEAKTIVAN = "NEAKTIVAN"
+
+
+# Odbijanja zbog vrste datoteke; ostala znače da se datoteka nije mogla obraditi.
+_ODBIJANJA_FORMATA = frozenset(
+    {RazlogOdbijanja.NEISPRAVAN_FORMAT, RazlogOdbijanja.STARI_DOC, RazlogOdbijanja.MAKRO}
+)
+
+
+def ukupni_status(izvjestaj: Izvjestaj | None, ima_datoteku: bool, aktivan: bool) -> UkupniStatus:
+    """Status studenta u batchu; ``izvjestaj`` je ``None`` kad datoteke nema ili je provjera pukla."""
+    if not aktivan:
+        return UkupniStatus.NEAKTIVAN
+    if not ima_datoteku:
+        return UkupniStatus.NIJE_PREDAO
+    if izvjestaj is None:
+        return UkupniStatus.NEUSPJELA_OBRADA
+    if izvjestaj.odbijeno is not None:
+        if izvjestaj.odbijeno in _ODBIJANJA_FORMATA:
+            return UkupniStatus.NEISPRAVAN_FORMAT
+        return UkupniStatus.NEUSPJELA_OBRADA
+    if any(n.status is Status.NEPROVJERLJIVO for n in izvjestaj.nalazi):
+        return UkupniStatus.ZA_RUCNI_PREGLED
+    return UkupniStatus.SPREMNO if spremnost(izvjestaj) else UkupniStatus.NIJE_SPREMNO

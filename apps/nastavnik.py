@@ -7,6 +7,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from provjera.adapteri import batch
 from provjera.adapteri.pdf_svojstva import izradi_pdf, spremi_pdf
 from provjera.adapteri.popis import (
     ZONA,
@@ -34,6 +35,7 @@ from provjera.adapteri.popis import (
 from provjera.adapteri.samoprovjera import GreskaReferentnog, otisak_skupa
 from provjera.adapteri.samoprovjera import pokreni as pokreni_samoprovjeru
 from provjera.jezgra import formula, profil, spremnost
+from provjera.jezgra.predaje import RezultatBatcha, opis_razloga, opis_statusa
 from provjera.jezgra.poruke import poruka
 from provjera.jezgra.samoprovjera import (
     NemaSkupa,
@@ -621,6 +623,132 @@ def prikazi_pdf(
     )
 
 
+# --- Batch provjera (priča 4.1) -------------------------------------------------
+
+KLJUC_BATCH = "batch_rezultat"
+
+
+def mapa_predaja(podaci: Path) -> Path | None:
+    """Unos mape predaja; ``None`` (uz poruku) dok mapa nije upotrebljiva."""
+    unos = st.text_input(
+        poruka("batch.mapa"), key="mapa_predaja", help=poruka("batch.mapa_pomoc")
+    ).strip()
+    if not unos:
+        st.caption(poruka("batch.mapa_prazna"))
+        return None
+    try:
+        mapa = Path(unos).expanduser()
+        if "\0" in unos or not mapa.is_absolute() or not mapa.is_dir():
+            raise ValueError("mapa predaja mora biti apsolutna putanja postojeće mape")
+        mapa = mapa.resolve()
+    except (OSError, RuntimeError, ValueError):
+        st.error(poruka("batch.mapa_neispravna"), icon="❌")
+        return None
+    if batch.unutar(mapa, podaci):
+        st.error(poruka("batch.mapa_u_podacima"), icon="❌")
+        return None
+    return mapa
+
+
+def _kljuc_batcha(
+    odabrani: profil.Profil, zamrznuti: tuple[Student, ...] | None, mapa: Path | None
+) -> tuple:
+    """Rezultat vrijedi samo za ovu vježbu, verziju profila, zamrznuti popis i mapu predaja."""
+    return (odabrani.vjezba.id, profil.verzija(odabrani), zamrznuti, mapa)
+
+
+def _pokreni_batch(
+    odabrani: profil.Profil, zamrznuti: tuple[Student, ...], mapa: Path, podaci: Path
+) -> None:
+    traka = st.progress(0.0)
+
+    def napredak(obradeno: int, ukupno: int) -> None:
+        traka.progress(
+            obradeno / ukupno,
+            text=poruka("batch.u_tijeku", obradeno=obradeno, ukupno=ukupno),
+        )
+
+    try:
+        rezultat = batch.pokreni(mapa, odabrani, zamrznuti, napredak, izuzeto=podaci)
+    except OSError as greska:
+        st.error(
+            poruka("batch.mapa_necitljiva", razlog=greska.strerror or type(greska).__name__),
+            icon="❌",
+        )
+        return
+    finally:
+        traka.empty()
+    st.session_state[KLJUC_BATCH] = (_kljuc_batcha(odabrani, zamrznuti, mapa), rezultat)
+
+
+def zadnji_batch(
+    odabrani: profil.Profil, zamrznuti: tuple[Student, ...] | None, mapa: Path | None
+) -> RezultatBatcha | None:
+    spremljeno = st.session_state.get(KLJUC_BATCH)
+    if spremljeno is None or spremljeno[0] != _kljuc_batcha(odabrani, zamrznuti, mapa):
+        return None
+    return spremljeno[1]
+
+
+def _opis_studenta(student: Student | None) -> str:
+    if student is None:
+        return ""
+    return poruka("batch.student", rbr=student.rbr, ime=student.ime, prezime=student.prezime)
+
+
+def prikazi_rezultat_batcha(rezultat: RezultatBatcha) -> None:
+    if not rezultat.datoteke:
+        st.info(poruka("batch.nema_datoteka"), icon="ℹ️")
+        return
+    st.success(poruka("batch.gotovo", broj=len(rezultat.datoteke)), icon="✅")
+    st.dataframe(
+        [
+            {
+                poruka("batch.stupac_datoteka"): d.relativno,
+                poruka("batch.stupac_student"): _opis_studenta(d.student),
+                poruka("batch.stupac_status"): "" if d.status is None else opis_statusa(d.status),
+                poruka("batch.stupac_razlog"): opis_razloga(d) or "",
+            }
+            for d in rezultat.datoteke
+        ],
+        hide_index=True,
+    )
+
+
+def prikazi_batch(
+    odabrani: profil.Profil,
+    zamrznuti: tuple[Student, ...] | None,
+    podaci: Path,
+    mapa_vjezbe: Path,
+) -> None:
+    st.subheader(poruka("batch.naslov"))
+    st.caption(poruka("batch.opis"))
+    problemi = batch.problemi_konfiguracije(odabrani, zamrznuti)
+    if problemi:
+        st.caption(poruka("batch.nije_moguce", broj=len(problemi)))
+        st.markdown("\n".join(f"- {poruka(p.kljuc, **p.parametri)}" for p in problemi))
+        return
+    mapa = mapa_predaja(podaci)
+    otisak = batch.stanje_otiska(odabrani, mapa_vjezbe)
+    potvrdeno = True
+    # Upozorenje tek uz odabranu mapu, kad je nastavnik spreman pokrenuti provjeru.
+    if mapa is not None and otisak is not batch.StanjeOtiska.ISTI:
+        st.warning(poruka(f"batch.otisak_{otisak.value}"), icon="⚠️")
+        # Potvrda vrijedi samo za ovo upozorenje, profil i mapu; promjena traži novu.
+        potvrdeno = st.checkbox(
+            poruka("batch.potvrda_otiska"),
+            key=f"potvrda_otiska_{otisak.value}_{profil.verzija(odabrani)}_{mapa}",
+        )
+    moze = mapa is not None and potvrdeno
+    if st.button(
+        poruka("batch.pokreni"), key="pokreni_batch", type="primary", disabled=not moze
+    ) and moze:
+        _pokreni_batch(odabrani, zamrznuti, mapa, podaci)
+    rezultat = zadnji_batch(odabrani, zamrznuti, mapa)
+    if rezultat is not None:
+        prikazi_rezultat_batcha(rezultat)
+
+
 st.set_page_config(page_title=poruka("nastavnik.naslov"), page_icon="📋")
 
 st.title(poruka("nastavnik.naslov"))
@@ -633,6 +761,7 @@ samoprovjera = rezultat_samoprovjere(vjezba)
 pregled_spremnosti = prikazi_spremnost(vjezba, zamrznuti, samoprovjera)
 prikazi_samoprovjeru(vjezba, samoprovjera)
 prikazi_pdf(vjezba, zamrznuti, pregled_spremnosti, mapa_vjezbe)
+prikazi_batch(vjezba, zamrznuti, mapa, mapa_vjezbe)
 
 st.subheader(poruka("nastavnik.popis_naslov"))
 datoteka = st.file_uploader(poruka("nastavnik.ucitaj_popis"), type=["xlsx"], key="isvu")

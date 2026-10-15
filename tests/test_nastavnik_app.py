@@ -1012,3 +1012,145 @@ def test_pdf_ostecen_izdano_prikazuje_gresku(podaci, aplikacija):
     at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
     assert not at.exception
     assert [e.value for e in at.error] == [poruka("popis.izdano_necitljivo")]
+
+
+# --- Batch provjera (priča 4.1) -------------------------------------------------
+
+
+def _batch_popis() -> tuple[Student, ...]:
+    return tuple(
+        Student(rbr=r, jmbag=f"{9900000000 + r}", ime="Ana", prezime=p, aktivan=True)
+        for r, p in ((1, "Horvat"), (2, "Kovač"))
+    )
+
+
+def _predaje(tmp_path: Path, vjezba: profil.Profil) -> Path:
+    from alati.generator import ispravan
+
+    from provjera.jezgra import naziv
+
+    mapa = tmp_path / "predaje"
+    mapa.mkdir()
+    for s in _batch_popis():
+        (mapa / naziv.kanonski(s.ime, s.prezime, vjezba)).write_bytes(ispravan(s.rbr, vjezba))
+    (mapa / "~$privremena.docx").write_bytes(b"x")
+    return mapa
+
+
+def _batch_aplikacija(aplikacija: AppTest, podaci: Path, izdano: bool = True) -> AppTest:
+    vjezba = profil.ucitaj(VJEZBA_1.read_bytes())
+    spremi(_batch_popis(), _popis_csv(podaci))
+    if izdano:
+        zapisi_izdano(_mapa_vjezbe(podaci), vjezba, datetime(2026, 10, 1, 12, 0, tzinfo=ZONA))
+    return aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+
+
+def test_batch_bez_popisa_nije_moguc(u_mapi):
+    assert poruka("batch.naslov") in [s.value for s in u_mapi.subheader]
+    assert poruka("batch.nije_moguce", broj=1) in [c.value for c in u_mapi.caption]
+    assert not u_mapi.get("button") or all(b.key != "pokreni_batch" for b in u_mapi.button)
+
+
+def test_batch_bez_mape_gumb_onemogucen(podaci, aplikacija):
+    at = _batch_aplikacija(aplikacija, podaci)
+    assert not at.exception
+    assert at.button(key="pokreni_batch").disabled
+    assert poruka("batch.mapa_prazna") in [c.value for c in at.caption]
+
+
+def test_batch_neispravna_mapa(podaci, aplikacija, tmp_path):
+    at = _batch_aplikacija(aplikacija, podaci)
+    at = at.text_input(key="mapa_predaja").input(str(tmp_path / "nema")).run()
+    assert poruka("batch.mapa_neispravna") in [e.value for e in at.error]
+    assert at.button(key="pokreni_batch").disabled
+
+
+def test_batch_sretan_put(podaci, aplikacija, tmp_path):
+    at = _batch_aplikacija(aplikacija, podaci)
+    mapa = _predaje(tmp_path, profil.ucitaj(VJEZBA_1.read_bytes()))
+    at = at.text_input(key="mapa_predaja").input(str(mapa)).run()
+    assert not [w for w in at.warning if w.value.startswith("Margine")]
+    gumb = at.button(key="pokreni_batch")
+    assert gumb.label == "Pokreni batch provjeru" and not gumb.disabled
+    at = gumb.click().run()
+    assert not at.exception
+    assert poruka("batch.gotovo", broj=2) in [s.value for s in at.success]
+    tablica = at.dataframe[-1].value
+    assert list(tablica[poruka("batch.stupac_status")]) == ["✅ spremno"] * 2
+    assert list(tablica[poruka("batch.stupac_student")]) == ["1. Ana Horvat", "2. Ana Kovač"]
+
+
+@pytest.mark.parametrize("izdano", ["nema", "drugi", "smece"])
+def test_batch_otisak_trazi_potvrdu(podaci, aplikacija, tmp_path, izdano):
+    at = _batch_aplikacija(aplikacija, podaci, izdano=izdano != "nema")
+    if izdano == "smece":
+        (_mapa_vjezbe(podaci) / "izdano.json").write_bytes(b"{")
+    if izdano == "drugi":
+        putanja = _mapa_vjezbe(podaci) / "izdano.json"
+        podaci_izdanog = json.loads(putanja.read_text(encoding="utf-8"))
+        podaci_izdanog["formula_otisak"] = "000000000000"
+        putanja.write_text(json.dumps(podaci_izdanog), encoding="utf-8")
+    mapa = _predaje(tmp_path, profil.ucitaj(VJEZBA_1.read_bytes()))
+    at = at.text_input(key="mapa_predaja").input(str(mapa)).run()
+    kljuc = {"nema": "batch.otisak_NEMA_IZDANOG", "drugi": "batch.otisak_RAZLICIT",
+             "smece": "batch.otisak_NECITLJIVO"}[izdano]
+    assert poruka(kljuc) in [w.value for w in at.warning]
+    assert at.button(key="pokreni_batch").disabled
+    at = at.checkbox[0].check().run()
+    assert not at.button(key="pokreni_batch").disabled
+    at = at.button(key="pokreni_batch").click().run()
+    assert poruka("batch.gotovo", broj=2) in [s.value for s in at.success]
+
+
+def _pokrenut_batch(aplikacija: AppTest, podaci: Path, mapa: Path) -> AppTest:
+    at = _batch_aplikacija(aplikacija, podaci)
+    at = at.text_input(key="mapa_predaja").input(str(mapa)).run()
+    return at.button(key="pokreni_batch").click().run()
+
+
+def test_batch_preskace_podatkovnu_mapu_unutar_predaja(aplikacija, tmp_path):
+    mapa = _predaje(tmp_path, profil.ucitaj(VJEZBA_1.read_bytes()))
+    podaci = mapa / "ProvjeraWord"
+    (podaci / "vjezba_2").mkdir(parents=True)
+    (podaci / "vjezba_2" / "rad.docx").write_bytes(b"x")
+    at = _pokrenut_batch(aplikacija, podaci, mapa)
+    assert not at.exception
+    assert poruka("batch.gotovo", broj=2) in [s.value for s in at.success]
+    assert all("ProvjeraWord" not in d for d in at.dataframe[-1].value[poruka("batch.stupac_datoteka")])
+
+
+@pytest.mark.parametrize("unutra", ["", "vjezba_1"])
+def test_batch_odbija_mapu_u_podatkovnoj_mapi(podaci, aplikacija, unutra):
+    at = _batch_aplikacija(aplikacija, podaci)
+    at = at.text_input(key="mapa_predaja").input(str(podaci / unutra)).run()
+    assert poruka("batch.mapa_u_podacima") in [e.value for e in at.error]
+    assert at.button(key="pokreni_batch").disabled
+
+
+def test_batch_rezultat_nestaje_kad_se_promijeni_popis_ili_mapa(podaci, aplikacija, tmp_path):
+    mapa = _predaje(tmp_path, profil.ucitaj(VJEZBA_1.read_bytes()))
+    at = _pokrenut_batch(aplikacija, podaci, mapa)
+    assert poruka("batch.gotovo", broj=2) in [s.value for s in at.success]
+    druga = tmp_path / "druga"
+    druga.mkdir()
+    at = at.text_input(key="mapa_predaja").input(str(druga)).run()
+    assert poruka("batch.gotovo", broj=2) not in [s.value for s in at.success]
+    at = at.text_input(key="mapa_predaja").input(str(mapa)).run()
+    assert poruka("batch.gotovo", broj=2) in [s.value for s in at.success]
+    spremi(_batch_popis()[:1], _popis_csv(podaci))
+    at = at.run()
+    assert poruka("batch.gotovo", broj=2) not in [s.value for s in at.success]
+
+
+def test_batch_necitljiva_mapa_prikazuje_gresku(podaci, aplikacija, tmp_path, monkeypatch):
+    from provjera.adapteri import batch
+
+    mapa = _predaje(tmp_path, profil.ucitaj(VJEZBA_1.read_bytes()))
+
+    def necitljivo(*_a, **_k):
+        raise PermissionError(13, "Pristup odbijen")
+
+    monkeypatch.setattr(batch, "pronadi_datoteke", necitljivo)
+    at = _pokrenut_batch(aplikacija, podaci, mapa)
+    assert not at.exception
+    assert poruka("batch.mapa_necitljiva", razlog="Pristup odbijen") in [e.value for e in at.error]
