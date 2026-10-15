@@ -49,3 +49,13 @@ def test_status_ima_ikonu_i_tekst():
         tekst = KATALOG[f"status.{status.value}"]
         ikona, _, rijec = tekst.partition(" ")
         assert ikona and not ikona.isalpha() and rijec
+
+
+def test_svaki_nacin_i_razlog_uparivanja_ima_poruku():
+    from provjera.jezgra.nalaz import NacinUparivanja
+    from provjera.jezgra.uparivanje import RazlogNepovezanosti
+
+    for razlog in RazlogNepovezanosti:
+        assert f"uparivanje.{razlog.value}" in KATALOG
+    for nacin in NacinUparivanja:
+        assert f"uparivanje.nacin.{nacin.value}" in KATALOG

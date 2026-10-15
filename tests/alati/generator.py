@@ -189,7 +189,10 @@ def podnozje_s_brojem(sekcija):
     return podnozje
 
 
-def _dokument(rbr: int, profil: Profil, jedna_sekcija: bool = False):
+NASLOVNICA = "Ana Horvat, 0000000000"
+
+
+def _dokument(rbr: int, profil: Profil, jedna_sekcija: bool = False, naslovnica_tekst: str = NASLOVNICA):
     dokument = docx.Document()
     _normal(dokument, profil)
     _heading1(dokument, profil)
@@ -199,12 +202,12 @@ def _dokument(rbr: int, profil: Profil, jedna_sekcija: bool = False):
     tijelo = _tijelo(rbr, profil)
     if jedna_sekcija:
         _margine(naslovnica, **tijelo)
-        dokument.add_paragraph("Ana Horvat, 0000000000")
+        dokument.add_paragraph(naslovnica_tekst)
         _sadrzaj(dokument, profil)
         podnozje_s_brojem(naslovnica)
         return dokument
     _margine(naslovnica, *(mm_u_twips(profil.formula.naslovnica),) * 4)
-    dokument.add_paragraph("Ana Horvat, 0000000000")
+    dokument.add_paragraph(naslovnica_tekst)
     sekcija = dokument.add_section(WD_SECTION_START.NEW_PAGE)
     _a4(sekcija)
     _margine(sekcija, **tijelo)
@@ -214,8 +217,8 @@ def _dokument(rbr: int, profil: Profil, jedna_sekcija: bool = False):
     return dokument
 
 
-def ispravan(rbr: int, profil: Profil) -> bytes:
-    return _spremi(_dokument(rbr, profil))
+def ispravan(rbr: int, profil: Profil, naslovnica: str = NASLOVNICA) -> bytes:
+    return _spremi(_dokument(rbr, profil, naslovnica_tekst=naslovnica))
 
 
 def _izmijeni(promjena: Callable) -> Callable[[int, Profil], bytes]:

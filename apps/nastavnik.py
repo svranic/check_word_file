@@ -35,7 +35,14 @@ from provjera.adapteri.popis import (
 from provjera.adapteri.samoprovjera import GreskaReferentnog, otisak_skupa
 from provjera.adapteri.samoprovjera import pokreni as pokreni_samoprovjeru
 from provjera.jezgra import formula, profil, spremnost
-from provjera.jezgra.predaje import RezultatBatcha, opis_razloga, opis_statusa
+from provjera.jezgra.predaje import (
+    RezultatBatcha,
+    opis_kandidata,
+    opis_nacina,
+    opis_razloga,
+    opis_statusa,
+    opis_studenta,
+)
 from provjera.jezgra.poruke import poruka
 from provjera.jezgra.samoprovjera import (
     NemaSkupa,
@@ -690,12 +697,6 @@ def zadnji_batch(
     return spremljeno[1]
 
 
-def _opis_studenta(student: Student | None) -> str:
-    if student is None:
-        return ""
-    return poruka("batch.student", rbr=student.rbr, ime=student.ime, prezime=student.prezime)
-
-
 def prikazi_rezultat_batcha(rezultat: RezultatBatcha) -> None:
     if not rezultat.datoteke:
         st.info(poruka("batch.nema_datoteka"), icon="ℹ️")
@@ -705,9 +706,11 @@ def prikazi_rezultat_batcha(rezultat: RezultatBatcha) -> None:
         [
             {
                 poruka("batch.stupac_datoteka"): d.relativno,
-                poruka("batch.stupac_student"): _opis_studenta(d.student),
+                poruka("batch.stupac_student"): "" if d.student is None else opis_studenta(d.student),
+                poruka("batch.stupac_nacin"): opis_nacina(d),
                 poruka("batch.stupac_status"): "" if d.status is None else opis_statusa(d.status),
                 poruka("batch.stupac_razlog"): opis_razloga(d) or "",
+                poruka("batch.stupac_kandidati"): opis_kandidata(d),
             }
             for d in rezultat.datoteke
         ],

@@ -107,3 +107,30 @@ def test_kanonski_odbija_prazno_ime(ime, prezime):
 def test_kontekst_trazi_oba_polja_zajedno(ocekivani, nacin):
     with pytest.raises(ValueError):
         KontekstProvjere(LUCIJA, 54, ocekivani, nacin)
+
+
+# --- naziv.kljuc_uparivanja ---------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "tekst",
+    [
+        "Ana_Horvat_GiG_OG_Vjezba_1.docx",
+        "ana_horvat_gig_og_vjezba_1 (1).DOCX",
+        "ANA_HORVAT_GIG_OG_VJEZBA_1(2).docx",
+        "Ana_Horvat_GiG_OG_Vjezba_1.pdf",
+    ],
+)
+def test_kljuc_uparivanja(tekst):
+    assert naziv.kljuc_uparivanja(tekst) == naziv.kljuc_uparivanja(
+        naziv.kanonski("Ana", "Horvat", PROFIL)
+    )
+
+
+def test_kljuc_bez_dijakritika_i_d():
+    assert naziv.kljuc_uparivanja("Đorđe_Šašić") == naziv.kljuc_uparivanja("Dorde_Sasic")
+    assert naziv.kljuc_uparivanja("Ana_Horvat_x") != naziv.kljuc_uparivanja("Ana_Horvat_y")
+
+
+def test_kljuc_vise_sufiksa_kopije():
+    assert naziv.kljuc_uparivanja("Ana_Horvat (1) (2).docx") == naziv.kljuc_uparivanja("Ana_Horvat.docx")

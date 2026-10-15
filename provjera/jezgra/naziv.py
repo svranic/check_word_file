@@ -36,3 +36,25 @@ def odgovara_obrascu(naziv: str, profil: "Profil") -> bool:
     nd = profil.naziv_datoteke
     obrazac = f"{_SLOVA}_{_SLOVA}" + re.escape(nfc(nd.sufiks + nd.nastavak))
     return re.fullmatch(obrazac, nfc(naziv)) is not None
+
+
+# Sufiks kopije koji dodaju preglednici i Windows: „rad (1).docx“.
+_SUFIKS_KOPIJE = re.compile(r"(\s*\(\d+\))+$")
+_NASTAVAK = re.compile(r"\.[^.\s]{1,5}$")
+
+
+def bez_dijakritika(tekst: str) -> str:
+    """„Đurđa Šćekić“ → „Durda Scekic“; ``đ`` se zamjenjuje ručno jer ga NFKD ne rastavlja."""
+    rastavljeno = unicodedata.normalize("NFKD", tekst.replace("đ", "d").replace("Đ", "D"))
+    return "".join(z for z in rastavljeno if not unicodedata.combining(z))
+
+
+def kljuc_uparivanja(tekst: str) -> str:
+    """Ključ koji zanemaruje nastavak, sufiks „ (1)“, dijakritike i velika i mala slova."""
+    osnova = _SUFIKS_KOPIJE.sub("", _NASTAVAK.sub("", nfc(tekst).strip()))
+    return bez_dijakritika(osnova).casefold()
+
+
+def rijeci(tekst: str) -> tuple[str, ...]:
+    """Riječi samo od slova, bez dijakritika i malim slovima (ime podmape, ime studenta)."""
+    return tuple(r.casefold() for r in re.findall(_SLOVA, bez_dijakritika(nfc(tekst))))

@@ -1,4 +1,4 @@
-"""Batch provjera (priča 4.1, FR25, AD-9): mapa predaja → povezivanje → ``provjeri()``.
+"""Batch provjera (priče 4.1 i 4.2, FR25, FR26, AD-9): mapa predaja → povezivanje → ``provjeri()``.
 
 Adapter samo čita datoteke i poziva jezgru; ništa ne piše u mapu predaja i ništa ne
 šalje na mrežu. Logira se samo broj datoteka, nikad naziv ni ime.
@@ -12,7 +12,7 @@ from enum import Enum
 from pathlib import Path
 
 from provjera.adapteri.popis import GreskaIzdanog, Student, procitaj_izdano
-from provjera.jezgra import formula, naziv, spremnost, ulaz
+from provjera.jezgra import formula, model, spremnost, ulaz, uparivanje
 from provjera.jezgra.nalaz import KontekstProvjere, NacinUparivanja
 from provjera.jezgra.predaje import RedakDatoteke, RezultatBatcha
 from provjera.jezgra.profil import Profil, verzija
@@ -110,32 +110,6 @@ def pronadi_datoteke(mapa: Path, izuzeto: Path | None = None) -> tuple[Path, ...
     return tuple(sorted(pronadene, key=lambda p: p.relative_to(mapa).parts))
 
 
-def _bez_nastavka(tekst: str, nastavak: str) -> str:
-    return tekst[: -len(nastavak)] if tekst.lower().endswith(nastavak.lower()) else tekst
-
-
-def _ocekivani_nazivi(profil: Profil, studenti: Sequence[Student]) -> dict[Student, str]:
-    nazivi = {}
-    for s in studenti:
-        try:
-            nazivi[s] = naziv.kanonski(s.ime, s.prezime, profil)
-        except ValueError:
-            continue  # ime bez slova nema kanonski naziv; ta datoteka ostaje nepovezana
-    return nazivi
-
-
-def _upari(
-    datoteka: Path, nazivi: dict[Student, str], profil: Profil
-) -> tuple[Student, NacinUparivanja] | None:
-    """Priča 4.1: samo točan naziv (bez obzira na nastavak) i samo jedan takav student."""
-    nastavak = profil.naziv_datoteke.nastavak
-    osnova = naziv.nfc(datoteka.stem)
-    pogoci = [s for s, n in nazivi.items() if _bez_nastavka(n, nastavak) == osnova]
-    if len(pogoci) != 1:
-        return None
-    return pogoci[0], NacinUparivanja.TOCAN
-
-
 def _procitaj(putanja: Path) -> bytes:
     """Najviše jedan bajt iznad granice, da jezgra sama odbije preveliku datoteku."""
     with open(putanja, "rb") as datoteka:
@@ -156,6 +130,21 @@ def _obradi(
     return RedakDatoteke(relativno, student, nacin, izvjestaj)
 
 
+def _brojevi_naslovnice(putanja: Path, profil: Profil) -> frozenset[str]:
+    """JMBAG-ovi s naslovnice; samo za .docx koji prolazi sigurnosnu provjeru ulaza.
+
+    Nijedna greška ovdje ne zaustavlja batch: datoteka tada samo nema JMBAG.
+    """
+    try:
+        sadrzaj = _procitaj(putanja)
+        if ulaz.provjeri_ulaz(putanja.name, sadrzaj) is not None:
+            return frozenset()
+        return model.brojevi_naslovnice(sadrzaj, profil.uloge)
+    except Exception as greska:  # noqa: BLE001 — provjera datoteke će prijaviti grešku
+        log.warning("batch: naslovnica nije pročitana (%s)", type(greska).__name__)
+        return frozenset()
+
+
 def pokreni(
     mapa: Path,
     profil: Profil,
@@ -163,18 +152,29 @@ def pokreni(
     napredak: Napredak | None = None,
     izuzeto: Path | None = None,
 ) -> RezultatBatcha:
-    """Provjerava sve datoteke u ``mapa``; validaciju i otisak pozivatelj radi prije."""
+    """Povezuje i provjerava sve datoteke u ``mapa``; validaciju i otisak radi pozivatelj."""
     datoteke = pronadi_datoteke(mapa, izuzeto)
-    nazivi = _ocekivani_nazivi(profil, studenti)
+    relativne = [p.relative_to(mapa) for p in datoteke]
+    uparivanja = uparivanje.razrijesi_visestruke(
+        [
+            uparivanje.upari(
+                p.name,
+                [m.name for m in reversed(r.parents[:-1])],
+                studenti,
+                profil,
+                lambda p=p: _brojevi_naslovnice(p, profil),
+            )
+            for p, r in zip(datoteke, relativne)
+        ],
+        [p.name.lower().endswith(".docx") for p in datoteke],
+    )
     retci: list[RedakDatoteke] = []
-    for i, putanja in enumerate(datoteke, start=1):
-        relativno = putanja.relative_to(mapa).as_posix()
-        par = _upari(putanja, nazivi, profil)
-        if par is None:
-            retci.append(RedakDatoteke(relativno))
+    for i, (putanja, relativna, u) in enumerate(zip(datoteke, relativne, uparivanja), start=1):
+        relativno = relativna.as_posix()
+        if isinstance(u, uparivanje.Nepovezano):
+            retci.append(RedakDatoteke(relativno, nepovezano=u.razlog, kandidati=u.kandidati))
         else:
-            student, nacin = par
-            retci.append(_obradi(putanja, relativno, student, nacin, nazivi[student], profil))
+            retci.append(_obradi(putanja, relativno, u.student, u.nacin, u.ocekivani_naziv, profil))
         if napredak is not None:
             napredak(i, len(datoteke))
     log.info("batch: obrađeno %d datoteka", len(datoteke))

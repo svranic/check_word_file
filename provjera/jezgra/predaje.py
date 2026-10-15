@@ -5,27 +5,20 @@ ovisi o formatu zamrznutog popisa.
 """
 
 from dataclasses import dataclass
-from typing import Protocol
 
 from provjera.jezgra.nalaz import Izvjestaj, NacinUparivanja
 from provjera.jezgra.poruke import poruka
 from provjera.jezgra.provjera import UkupniStatus, ukupni_status
-
-
-class StudentPopisa(Protocol):
-    rbr: int
-    jmbag: str
-    ime: str
-    prezime: str
-    aktivan: bool
+from provjera.jezgra.uparivanje import RazlogNepovezanosti, StudentPopisa
 
 
 @dataclass(frozen=True)
 class RedakDatoteke:
     """Jedna predana datoteka; ``relativno`` je putanja od mape predaja (s ``/``).
 
-    Povezana datoteka ima ``student`` i ``nacin``. ``izvjestaj`` je ``None`` kad datoteka
-    nije provjerena (nepovezana) ili je provjera pukla; tada ``greska`` nosi ime iznimke.
+    Povezana datoteka ima ``student`` i ``nacin``. Nepovezana ima ``nepovezano`` (razlog)
+    i ``kandidati``. ``izvjestaj`` je ``None`` kad datoteka nije provjerena (nepovezana)
+    ili je provjera pukla; tada ``greska`` nosi ime iznimke.
     """
 
     relativno: str
@@ -33,6 +26,8 @@ class RedakDatoteke:
     nacin: NacinUparivanja | None = None
     izvjestaj: Izvjestaj | None = None
     greska: str | None = None
+    nepovezano: RazlogNepovezanosti | None = None
+    kandidati: tuple[StudentPopisa, ...] = ()
 
     @property
     def naziv(self) -> str:
@@ -76,6 +71,18 @@ def opis_razloga(redak: RedakDatoteke) -> str | None:
         return poruka("batch.razlog_iznimka", greska=redak.greska)
     if redak.izvjestaj is not None and redak.izvjestaj.odbijeno is not None:
         return poruka(f"batch.odbijeno.{redak.izvjestaj.odbijeno.value}")
-    if redak.student is None:
-        return poruka("batch.nepovezano")
+    if redak.nepovezano is not None:
+        return poruka(f"uparivanje.{redak.nepovezano.value}")
     return None
+
+
+def opis_studenta(student: StudentPopisa) -> str:
+    return poruka("batch.student", rbr=student.rbr, ime=student.ime, prezime=student.prezime)
+
+
+def opis_kandidata(redak: RedakDatoteke) -> str:
+    return "; ".join(opis_studenta(s) for s in redak.kandidati)
+
+
+def opis_nacina(redak: RedakDatoteke) -> str:
+    return "" if redak.nacin is None else poruka(f"uparivanje.nacin.{redak.nacin.value}")

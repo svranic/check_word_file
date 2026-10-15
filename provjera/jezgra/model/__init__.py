@@ -5,6 +5,7 @@ veličine fonta polutočke, prored 240-ine retka.
 """
 
 import io
+import re
 import zipfile
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -466,4 +467,26 @@ def procitaj(sadrzaj: bytes, nazivi: NaziviUloga) -> DocModel:
         parna_neparna=_parna_neparna(dokument),
         pracene_promjene=pracene_promjene(dokument),
         okviri=okviri,
+    )
+
+
+_JMBAG = re.compile(r"(?<![0-9])[0-9]{10}(?![0-9])")
+
+
+def brojevi_naslovnice(sadrzaj: bytes, nazivi: NaziviUloga) -> frozenset[str]:
+    """Samostalni 10-znamenkasti brojevi u odlomcima naslovnice (povezivanje po JMBAG-u).
+
+    Dokument koji se ne može parsirati daje prazan skup; ``sadrzaj`` je prošao ``ulaz``.
+    """
+    try:
+        model = procitaj(sadrzaj, nazivi)
+    except MemoryError:
+        raise
+    except Exception:  # noqa: BLE001 — nečitljiva naslovnica samo ne daje JMBAG
+        return frozenset()
+    return frozenset(
+        broj
+        for o in model.odlomci
+        if o.uloga is UlogaOdlomka.NASLOVNICA
+        for broj in _JMBAG.findall(o.tekst)
     )

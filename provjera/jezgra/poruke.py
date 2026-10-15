@@ -5,7 +5,7 @@ a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefik
 ``app.``, ``nastavnik.``, ``popis.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
 ``margine.``, ``naziv.``, ``ulaz.``, ``opce.``, ``status.``, ``izvjestaj.``,
 ``lokacija.``, ``izvor.``, ``sazetak.``, ``poravnanje.``, ``prored.``, ``spremnost.``,
-``samoprovjera.``, ``pdf.``, ``batch.``, ``ukupni_status.`` i ``vrijednost.``.
+``samoprovjera.``, ``pdf.``, ``batch.``, ``ukupni_status.``, ``uparivanje.`` i ``vrijednost.``.
 """
 
 from collections.abc import Mapping
@@ -864,7 +864,18 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "batch.stupac_status": "Status",
         "batch.stupac_razlog": "Razlog",
         "batch.student": "{rbr}. {ime} {prezime}",
-        "batch.nepovezano": "datoteka nije povezana ni s jednim studentom",
+        "batch.stupac_nacin": "Povezano po",
+        "batch.stupac_kandidati": "Kandidati",
+        "uparivanje.nacin.TOCAN": "točnom nazivu",
+        "uparivanje.nacin.PRIBLIZAN": "približnom nazivu",
+        "uparivanje.nacin.PODMAPA": "imenu podmape",
+        "uparivanje.nacin.JMBAG": "JMBAG-u s naslovnice",
+        "uparivanje.bez_podudaranja": "datoteka nije povezana ni s jednim studentom",
+        "uparivanje.dvosmisleno": "dvosmisleno – datoteka odgovara više studenata, a JMBAG ih ne razlučuje",
+        "uparivanje.jmbag_nije_na_popisu": "JMBAG s naslovnice nije na zamrznutom popisu",
+        "uparivanje.vise_jmbagova": "na naslovnici je više JMBAG-ova s popisa",
+        "uparivanje.visestruko": "višestruka predaja – student već ima bolje povezanu datoteku",
+        "uparivanje.neaktivan": "datoteka pripada neaktivnom (ispisanom) studentu",
         "batch.razlog_iznimka": "neočekivana greška pri obradi ({greska})",
         "batch.odbijeno.prazna": "datoteka je prazna",
         "batch.odbijeno.neispravan_format": "datoteka nije .docx",

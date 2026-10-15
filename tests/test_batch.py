@@ -258,7 +258,8 @@ def test_isti_naziv_dva_studenta_ostaje_nepovezan(tmp_path):
     _predaj(tmp_path, studenti[0])
     (redak,) = batch.pokreni(tmp_path, PROFIL, studenti).datoteke
     assert redak.student is None
-    assert opis_razloga(redak) == "datoteka nije povezana ni s jednim studentom"
+    assert opis_razloga(redak) == "dvosmisleno – datoteka odgovara više studenata, a JMBAG ih ne razlučuje"
+    assert redak.kandidati == studenti
 
 
 def test_necitljiva_podmapa_baca_oserror(tmp_path, monkeypatch):
