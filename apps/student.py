@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import logging
 import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -99,17 +100,18 @@ def ucitaj_dokument(odabrani: profil.Profil, broj: int) -> None:
         st.rerun()
 
     if st.session_state.get("greska_provjere"):
-        st.error(poruka(st.session_state["greska_provjere"]))
+        st.error(poruka(st.session_state["greska_provjere"]), icon="❌")
     elif st.session_state.get("izvjestaj") is not None:
         try:
             prikazi_izvjestaj(st.session_state["izvjestaj"])
         except Exception:  # noqa: BLE001 — student nikad ne vidi traceback
-            st.error(poruka("izvjestaj.greska"))
+            st.error(poruka("izvjestaj.greska"), icon="❌")
         else:
             try:
                 ponudi_sazetak(st.session_state["izvjestaj"], odabrani)
-            except Exception:  # noqa: BLE001 — bez sažetka izvještaj i dalje vrijedi
-                pass
+            except Exception as greska:  # noqa: BLE001 — bez sažetka izvještaj i dalje vrijedi
+                # Samo tip greške: nikad naziv datoteke ni sadržaj (AD-10).
+                logging.getLogger(__name__).warning("sažetak nije izrađen (%s)", type(greska).__name__)
 
 
 def prikazi_nalaz(nalaz: Nalaz) -> None:
@@ -140,7 +142,7 @@ def prikazi_nalaz(nalaz: Nalaz) -> None:
 def ponudi_sazetak(izvjestaj: Izvjestaj, odabrani: profil.Profil) -> None:
     if izvjestaj.odbijeno is not None:
         return
-    vrijeme = st.session_state["vrijeme_provjere"]
+    vrijeme = st.session_state.get("vrijeme_provjere", "–")
     st.download_button(
         poruka("sazetak.preuzmi"),
         data=html_sazetka(izvjestaj, odabrani.vjezba.naziv, vrijeme).encode("utf-8"),
@@ -152,7 +154,7 @@ def ponudi_sazetak(izvjestaj: Izvjestaj, odabrani: profil.Profil) -> None:
 def prikazi_izvjestaj(izvjestaj: Izvjestaj) -> None:
     if izvjestaj.odbijeno is not None:
         razlog = izvjestaj.odbijeno
-        st.error(poruka(f"ulaz.{razlog}", mb=VELICINA_PO_RAZLOGU.get(razlog, 0)))
+        st.error(poruka(f"ulaz.{razlog}", mb=VELICINA_PO_RAZLOGU.get(razlog, 0)), icon="❌")
         return
     if spremnost(izvjestaj):
         st.success(poruka("izvjestaj.spremno"), icon="✅")
@@ -173,8 +175,16 @@ st.title(poruka("app.naslov"))
 st.write(poruka("app.podnaslov"))
 st.info(poruka("privatnost.obrada"), icon="🔒")
 
+def _procitaj_profil(datoteka: Path) -> bytes:
+    """Nečitljiva datoteka profila broji se kao neispravan profil, ne ruši stranicu."""
+    try:
+        return datoteka.read_bytes()
+    except OSError:
+        return b""
+
+
 profili, neispravnih = profil.objavljeni(
-    datoteka.read_bytes() for datoteka in sorted(MAPA_PROFILA.glob("*.toml"))
+    _procitaj_profil(datoteka) for datoteka in sorted(MAPA_PROFILA.glob("*.toml"))
 )
 if not profili:
     st.warning(poruka("profil.nedostupno"))
@@ -198,11 +208,11 @@ with st.form("rbr_obrazac"):
 
 broj = st.session_state.get("rbr")
 if st.session_state.get("rbr_greska"):
-    st.error(poruka(st.session_state["rbr_greska"]))
+    st.error(poruka(st.session_state["rbr_greska"]), icon="❌")
 elif broj is not None:
     najveci = formula.najveci_rbr(odabrani.formula)
     if broj > najveci:
-        st.error(poruka("rbr.prevelik", rbr=broj, najveci=najveci))
+        st.error(poruka("rbr.prevelik", rbr=broj, najveci=najveci), icon="❌")
     else:
         prikazi_margine(odabrani, broj)
         ucitaj_dokument(odabrani, broj)

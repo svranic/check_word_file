@@ -36,6 +36,8 @@ def privremena_pravila(monkeypatch):
     """Zamjenjuje registar kopijom kojoj test dodaje pravila."""
     registar = dict(REGISTAR)
     monkeypatch.setattr("provjera.jezgra.provjera.REGISTAR", registar)
+    # Testna pravila koriste ključ ``test.kljuc`` izvan kataloga; tekst se ovdje ne provjerava.
+    monkeypatch.setattr("provjera.jezgra.provjera._prikaziv", lambda _nalaz: True)
 
     def dodaj(pravilo_id, funkcija):
         registar[pravilo_id] = Pravilo(pravilo_id, funkcija, PostavkeBaza, ())
@@ -245,3 +247,24 @@ def test_svaki_ukupni_status_ima_ikonu_i_tekst():
         assert f"ukupni_status.{status.value}" in KATALOG
         ikona, _, tekst = opis_statusa(status).partition(" ")
         assert ikona and not ikona.isalpha() and tekst == opis_statusa(status, ikona=False)
+
+
+def test_nalaz_koji_se_ne_moze_prikazati_je_neprovjerljiv(monkeypatch):
+    registar = dict(REGISTAR)
+    monkeypatch.setattr("provjera.jezgra.provjera.REGISTAR", registar)
+    registar["R-NAZIV"] = Pravilo(
+        "R-NAZIV", lambda *_: [_nalaz("R-NAZIV", kljuc="ne.postoji")], PostavkeBaza, ()
+    )
+    izvjestaj = provjeri(_docx(), PROFIL, _kontekst())
+    (nalaz,) = [n for n in izvjestaj.nalazi if n.pravilo_id == "R-NAZIV"]
+    assert nalaz.status is Status.NEPROVJERLJIVO
+    assert nalaz.parametri["razlog"] == "neispravan tekst nalaza"
+
+
+def test_memory_error_u_modelu_se_propusta(monkeypatch):
+    def puca(*_a, **_k):
+        raise MemoryError
+
+    monkeypatch.setattr("provjera.jezgra.model.procitaj", puca)
+    with pytest.raises(MemoryError):
+        provjeri(_docx(), PROFIL, _kontekst())

@@ -332,7 +332,7 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "vrijednost.da": "da",
         "vrijednost.ne": "ne",
         "rbr.potvrdi": "Prikaži moje margine",
-        "rbr.prazno": "Upiši svoj redni broj, npr. 54.",
+        "rbr.prazno": "Upiši svoj redni broj (pozitivan cijeli broj), npr. 54.",
         "rbr.neispravno": "Redni broj mora biti pozitivan cijeli broj, npr. 54.",
         "rbr.prevelik": (
             "Redni broj {rbr} ne postoji za ovu vježbu (najveći je {najveci}). "

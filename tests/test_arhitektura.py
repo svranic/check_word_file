@@ -267,3 +267,31 @@ def test_student_prikazuje_naslov_i_napomenu_o_privatnosti():
 def test_nepoznat_kljuc_baca_keyerror():
     with pytest.raises(KeyError):
         poruka("nepostojeci.kljuc")
+
+
+def _ignorirano(putanja: str) -> bool:
+    rezultat = subprocess.run(
+        ["git", "check-ignore", "-q", "--no-index", putanja], cwd=KORIJEN, check=False
+    )
+    return rezultat.returncode == 0
+
+
+@pytest.mark.parametrize("nastavak", OSOBNI_NASTAVCI)
+def test_gitignore_dopusta_sintetske_podatke_samo_u_tests(nastavak):
+    assert not _ignorirano(f"tests/fixtures/primjer{nastavak}")
+    assert _ignorirano(f"primjer{nastavak}")
+    assert _ignorirano(f"apps/primjer{nastavak}")
+
+
+def test_gitignore_ignorira_samples():
+    assert _ignorirano("samples/biljeska.txt")
+
+
+def test_predlosci_poruka_su_ispravni():
+    import string
+
+    for kljuc, tekst in KATALOG.items():
+        try:
+            list(string.Formatter().parse(tekst))
+        except ValueError as greska:
+            pytest.fail(f"{kljuc}: {greska}")

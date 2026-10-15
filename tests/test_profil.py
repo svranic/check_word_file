@@ -190,3 +190,33 @@ def test_poveznica_mora_biti_https(poveznica):
 def test_poveznica_vjezbe_1():
     p = profil.ucitaj(PROFIL_VJEZBE_1.read_bytes())
     assert p.vjezba.poveznica.startswith("https://")
+
+
+@pytest.mark.parametrize(
+    ("staro", "novo", "poruka_greske"),
+    [
+        # Bez ove provjere formula se za raspon 0 vrti beskonačno.
+        ('raspon = "0,5 cm"', 'raspon = "0 cm"', "raspon mora biti pozitivan višekratnik koraka"),
+        ('korak = "0,1 cm"', 'korak = "0,2 cm"', "raspon mora biti pozitivan višekratnik koraka"),
+    ],
+)
+def test_raspon_mora_biti_pozitivan_visekratnik_koraka(staro, novo, poruka_greske):
+    with pytest.raises(profil.GreskaProfila) as greska:
+        profil.ucitaj(_vjezba_1().replace(staro, novo).encode("utf-8"))
+    assert any(poruka_greske in g for g in greska.value.greske)
+
+
+def test_neispravan_neobjavljeni_nacrt_se_ne_broji():
+    nacrt = _vjezba_1().replace("objavljeno = true", "objavljeno = false")
+    nacrt = nacrt.replace('korak = "0,1 cm"', 'korak = "0 cm"').encode("utf-8")
+    profili, neispravnih = profil.objavljeni([_vjezba_1().encode("utf-8"), nacrt])
+    assert [p.vjezba.id for p in profili] == ["vjezba_1"]
+    assert neispravnih == 0
+
+
+def test_verzija_se_mijenja_s_postavkom_pravila():
+    a = profil.ucitaj(_vjezba_1().encode("utf-8"))
+    izvor = _vjezba_1()
+    assert 'font = "Calibri"' in izvor
+    b = profil.ucitaj(izvor.replace('font = "Calibri"', 'font = "Arial"', 1).encode("utf-8"))
+    assert profil.verzija(a) != profil.verzija(b)

@@ -1,6 +1,7 @@
 """Sigurni ulaz (FR-10, AD-12): provjera bajtova prije bilo kakvog parsiranja dokumenta."""
 
 import io
+import lzma
 import zipfile
 import zlib
 from enum import StrEnum
@@ -47,13 +48,15 @@ def _razlog_zipa(sadrzaj: bytes) -> RazlogOdbijanja | None:
             # Deklarirane veličine; parser modela mora i sam ograničiti stvarno čitanje.
             if len(stavke) > _NAJVISE_STAVKI or sum(s.file_size for s in stavke) > NAJVECA_RASPAKIRANA:
                 return RazlogOdbijanja.ZIP_BOMBA
-            imena = {s.filename: s for s in stavke}
-            content_types = imena.get("[Content_Types].xml")
+            # Imena dijelova paketa (OPC) ne ovise o velikim i malim slovima.
+            imena = {s.filename.lower(): s for s in stavke}
+            content_types = imena.get("[content_types].xml")
             if content_types is None or "word/document.xml" not in imena:
                 return RazlogOdbijanja.OSTECENA
             if content_types.file_size > _NAJVECI_CONTENT_TYPES:
                 return RazlogOdbijanja.OSTECENA
-            if "word/vbaProject.bin" in imena or b"macroEnabled" in arhiva.read(content_types):
+            tipovi = arhiva.read(content_types).lower()
+            if "word/vbaproject.bin" in imena or b"macroenabled" in tipovi or b"vbaproject" in tipovi:
                 return RazlogOdbijanja.MAKRO
     except (
         zipfile.BadZipFile,
@@ -64,6 +67,7 @@ def _razlog_zipa(sadrzaj: bytes) -> RazlogOdbijanja | None:
         ValueError,
         OSError,
         EOFError,
+        lzma.LZMAError,  # oštećena stavka komprimirana LZMA-om
     ):
         return RazlogOdbijanja.OSTECENA
     return None

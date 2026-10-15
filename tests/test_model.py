@@ -180,3 +180,56 @@ def test_dokument_bez_sekcija_je_neprovjerljiv():
         pravilo = REGISTAR[pravilo_id]
         [nalaz] = pravilo.funkcija(prazan, KONTEKST, PROFIL.pravila[pravilo_id], PROFIL)
         assert nalaz.status is Status.NEPROVJERLJIVO
+
+
+def _sirina_tijela(pomak: int):
+    from docx.shared import Twips
+
+    def promjena(d):
+        d.sections[1].page_width = Twips(11906 + pomak)
+
+    return promjena
+
+
+def test_velicina_stranice_unutar_tolerancije_prolazi():
+    assert PROFIL.tolerancije.stranica > 40
+    assert _kljucevi_koji_padaju(_s_promjenom(_sirina_tijela(40))) == set()
+
+
+def test_velicina_stranice_izvan_tolerancije_nije_a4():
+    pomak = PROFIL.tolerancije.stranica + 1
+    assert _kljucevi_koji_padaju(_s_promjenom(_sirina_tijela(pomak))) == {"R-MARGINE.nije_a4"}
+
+
+def test_nedostajuca_velicina_stranice_je_neprovjerljiva_samo_za_tu_sekciju():
+    m = model.procitaj(ispravan(54, PROFIL), PROFIL.uloge)
+    m = replace(m, sekcije=(m.sekcije[0], replace(m.sekcije[1], sirina=None)))
+    pravilo = REGISTAR["R-MARGINE"]
+    nalazi = pravilo.funkcija(m, KONTEKST, PROFIL.pravila["R-MARGINE"], PROFIL)
+    druga = [n for n in nalazi if n.lokacija.sekcija == 2]
+    assert [n.poruka_kljuc for n in druga if n.status is Status.NEPROVJERLJIVO] == [
+        "R-MARGINE.nedostaje_stranica"
+    ]
+    assert all(n.status is Status.PROSLO for n in nalazi if n.lokacija.sekcija == 1)
+
+
+def test_pejzaz_prema_atributu_orient_bez_dimenzija():
+    from docx.oxml.ns import qn
+
+    def promjena(d):
+        pg_sz = d.sections[1]._sectPr.find(qn("w:pgSz"))
+        for atribut in ("w:w", "w:h"):
+            pg_sz.attrib.pop(qn(atribut), None)
+        pg_sz.set(qn("w:orient"), "landscape")
+
+    m = model.procitaj(_s_promjenom(promjena), PROFIL.uloge)
+    assert m.sekcije[1].pejzazno is True
+
+
+def test_negativna_gornja_margina_je_ista_margina():
+    def promjena(d):
+        s = d.sections[1]
+        s.top_margin = -s.top_margin
+        s.bottom_margin = -s.bottom_margin
+
+    assert _kljucevi_koji_padaju(_s_promjenom(promjena)) == set()

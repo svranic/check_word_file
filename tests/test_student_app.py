@@ -390,3 +390,61 @@ def test_greska_sazetka_ne_prikazuje_gresku_provjere(monkeypatch):
     assert not at.error
     assert at.success
     assert at.get("download_button") == []
+
+
+def test_margine_i_naziv_dolaze_iz_odabrane_vjezbe(monkeypatch):
+    p = profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes())
+    druga = p.model_copy(
+        update={
+            "vjezba": p.vjezba.model_copy(update={"id": "vjezba_2", "naziv": "Vježba 2"}),
+            "formula": p.formula.model_copy(update={"sjeme": 12345}),
+            "naziv_datoteke": p.naziv_datoteke.model_copy(update={"sufiks": "_GiG_OG_Vjezba_2"}),
+        }
+    )
+    assert formula.margine(54, druga.formula) != formula.margine(54, p.formula)
+    monkeypatch.setattr(profil, "objavljeni", lambda _sadrzaji: ([p, druga], 0))
+    at = _posalji(AppTest.from_file(STUDENT).run(), "54")
+    at = at.selectbox(key="vjezba").select("vjezba_2").run()
+    at = _posalji(at, "54")
+    ocekivane = formula.margine(54, druga.formula).u_twips()
+    assert [m.value for m in at.metric] == [
+        formatiraj(ocekivane[s], Jedinica.TWIPS) for s in ("gore", "dolje", "lijevo", "desno")
+    ]
+    assert "_GiG_OG_Vjezba_2" in " ".join(m.value for m in at.markdown)
+
+
+def test_necitljiv_profil_ne_rusi_stranicu(monkeypatch):
+    from pathlib import Path
+
+    pravi = Path.read_bytes
+
+    def citaj(self):
+        if self.suffix == ".toml":
+            raise PermissionError("zaključano")
+        return pravi(self)
+
+    monkeypatch.setattr(Path, "read_bytes", citaj)
+    at = AppTest.from_file(STUDENT).run()
+    assert not at.exception
+    assert [w.value for w in at.warning] == [poruka("profil.nedostupno")]
+
+
+def test_gumb_za_sazetak_salje_html_s_nazivom_i_vrstom(monkeypatch, aplikacija):
+    import streamlit
+
+    pozivi = []
+    pravi = streamlit.download_button
+
+    def spijun(*a, **k):
+        pozivi.append(k)
+        return pravi(*a, **k)
+
+    monkeypatch.setattr(streamlit, "download_button", spijun)
+    at = _posalji(aplikacija, "54")
+    datoteka = ispravan(54, profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes()))
+    at = _ucitaj(at, "Ana_Horvat_GiG_OG_Vjezba_1.docx", datoteka)
+    assert pozivi, "gumb za sažetak nije prikazan"
+    poziv = pozivi[-1]
+    assert poziv["file_name"] == "sazetak_provjere_rbr_54.html"
+    assert poziv["mime"] == "text/html"
+    assert poziv["data"].decode("utf-8").lstrip().lower().startswith("<!doctype html>")

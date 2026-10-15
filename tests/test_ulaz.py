@@ -137,3 +137,36 @@ def test_nastavak_velikim_slovima_i_dvostruki(naziv, razlog):
 def test_granica_velicine_je_ukljucena():
     sadrzaj = b"PK\x03\x04" + b"\0" * (ulaz.NAJVECA_VELICINA - 4)
     assert ulaz.provjeri_ulaz("rad.docx", sadrzaj) is not R.PREVELIKA
+
+
+def test_ostecen_lzma_zip_je_ostecen():
+    import lzma  # noqa: F401 — ZIP_LZMA treba modul lzma
+
+    spremnik = io.BytesIO()
+    with zipfile.ZipFile(spremnik, "w", zipfile.ZIP_LZMA) as arhiva:
+        arhiva.writestr("[Content_Types].xml", "<Types>" + "x" * 5000 + "</Types>")
+        arhiva.writestr("word/document.xml", "<w/>")
+    podaci = bytearray(spremnik.getvalue())
+    pocetak = podaci.find(b"[Content_Types].xml") + len("[Content_Types].xml") + 20
+    for i in range(pocetak, pocetak + 40):
+        podaci[i] ^= 0xFF
+    assert ulaz.provjeri_ulaz("rad.docx", bytes(podaci)) is R.OSTECENA
+
+
+@pytest.mark.parametrize(
+    "datoteke",
+    [
+        {"[Content_Types].xml": b"<Types/>", "word/document.xml": b"<w/>", "Word/VBAProject.bin": b"x"},
+        {
+            "[content_types].xml": b'<Types><Override ContentType="application/vnd.ms-word.document.MACROENABLED.main+xml"/></Types>',
+            "word/document.xml": b"<w/>",
+        },
+        {
+            "[Content_Types].xml": b'<Types><Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/></Types>',
+            "word/document.xml": b"<w/>",
+            "word/makro.bin": b"x",
+        },
+    ],
+)
+def test_makro_bez_obzira_na_slova_i_putanju(datoteke):
+    assert ulaz.provjeri_ulaz("rad.docx", zip_s(datoteke)) is R.MAKRO

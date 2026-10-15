@@ -183,8 +183,9 @@ def _sekcija(indeks: int, uloga: Uloga, s, podnozja: PodnozjaSekcije = PodnozjaS
     return Sekcija(
         indeks=indeks,
         uloga=uloga,
-        gore=_twips(s.top_margin),
-        dolje=_twips(s.bottom_margin),
+        # Negativna gornja/donja margina je Wordov oblik „točno“ (zaglavlje ne pomiče tekst).
+        gore=_apsolutno(_twips(s.top_margin)),
+        dolje=_apsolutno(_twips(s.bottom_margin)),
         lijevo=_twips(s.left_margin),
         desno=_twips(s.right_margin),
         gutter=_twips(s.gutter),
@@ -195,6 +196,10 @@ def _sekcija(indeks: int, uloga: Uloga, s, podnozja: PodnozjaSekcije = PodnozjaS
         prva_stranica=je_istina(s._sectPr.find(qn("w:titlePg"))),
         podnozja=podnozja,
     )
+
+
+def _apsolutno(twips: int | None) -> int | None:
+    return None if twips is None else abs(twips)
 
 
 def _zrcalne_margine(dokument) -> bool:

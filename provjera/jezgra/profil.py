@@ -135,6 +135,15 @@ def ucitaj(sadrzaj: bytes) -> Profil:
         raise GreskaProfila(tuple(_opis_greske(g) for g in greska.errors())) from greska
 
 
+def _izricito_neobjavljen(sadrzaj: bytes) -> bool:
+    try:
+        podaci = tomllib.loads(sadrzaj.decode("utf-8-sig"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError):
+        return False
+    vjezba = podaci.get("vjezba")
+    return isinstance(vjezba, dict) and vjezba.get("objavljeno") is False
+
+
 def objavljeni(sadrzaji: Iterable[bytes]) -> tuple[list[Profil], int]:
     """Vraća objavljene profile (redom kako su zadani) i broj neispravnih.
 
@@ -145,7 +154,9 @@ def objavljeni(sadrzaji: Iterable[bytes]) -> tuple[list[Profil], int]:
         try:
             profil = ucitaj(sadrzaj)
         except GreskaProfila:
-            neispravnih += 1
+            # Neispravan nacrt s ``objavljeno = false`` studente se ne tiče.
+            if not _izricito_neobjavljen(sadrzaj):
+                neispravnih += 1
             continue
         if not profil.vjezba.objavljeno:
             continue

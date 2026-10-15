@@ -5,6 +5,7 @@ from enum import Enum
 
 from provjera.jezgra import model, ulaz
 from provjera.jezgra.nalaz import Dio, Izvjestaj, KontekstProvjere, Lokacija, Nalaz, Status
+from provjera.jezgra.poruke import opis_lokacije, poruka, tekst_nalaza
 from provjera.jezgra.pravila import REGISTAR
 from provjera.jezgra.profil import Profil, verzija
 from provjera.jezgra.ulaz import RazlogOdbijanja
@@ -21,6 +22,18 @@ def _neprovjerljivo(pravilo_id: str, razlog: str) -> Nalaz:
         poruka_kljuc="opce.neprovjerljivo",
         parametri={"razlog": razlog},
     )
+
+
+def _prikaziv(nalaz: Nalaz) -> bool:
+    """Nalaz čiji se tekst ne može složiti (nepoznat ključ, parametar) srušio bi cijeli
+    izvještaj pri prikazu; zato postaje neprovjerljiv već ovdje."""
+    try:
+        tekst_nalaza(nalaz)
+        poruka(f"pravilo.{nalaz.pravilo_id}")
+        opis_lokacije(nalaz.lokacija)
+    except Exception:  # noqa: BLE001 — bilo koja greška teksta je greška pravila
+        return False
+    return True
 
 
 def _sazmi(nalazi: list[Nalaz]) -> list[Nalaz]:
@@ -76,6 +89,8 @@ def provjeri(docx: bytes, profil: Profil, kontekst: KontekstProvjere) -> Izvjest
                 rezultat = [_neprovjerljivo(pravilo_id, "pravilo nije vratilo nalaz")]
             if not all(isinstance(n, Nalaz) and n.pravilo_id == pravilo_id for n in rezultat):
                 rezultat = [_neprovjerljivo(pravilo_id, "neispravan rezultat pravila")]
+            elif not all(_prikaziv(n) for n in rezultat):
+                rezultat = [_neprovjerljivo(pravilo_id, "neispravan tekst nalaza")]
             rezultat = _sazmi(rezultat)
         except MemoryError:
             raise
