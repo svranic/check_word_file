@@ -7,7 +7,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from provjera.adapteri import batch
+from provjera.adapteri import batch, excel_izlaz
 from provjera.adapteri.pdf_svojstva import izradi_pdf, spremi_pdf
 from provjera.adapteri.popis import (
     ZONA,
@@ -34,7 +34,7 @@ from provjera.adapteri.popis import (
 )
 from provjera.adapteri.samoprovjera import GreskaReferentnog, otisak_skupa
 from provjera.adapteri.samoprovjera import pokreni as pokreni_samoprovjeru
-from provjera.jezgra import formula, profil, spremnost
+from provjera.jezgra import formula, profil, spremnost, zbirna
 from provjera.jezgra.predaje import (
     RezultatBatcha,
     opis_kandidata,
@@ -664,9 +664,32 @@ def _kljuc_batcha(
     return (odabrani.vjezba.id, profil.verzija(odabrani), zamrznuti, mapa)
 
 
+def _spremi_tablicu(
+    odabrani: profil.Profil, rezultat: RezultatBatcha, mapa_vjezbe: Path, vrijeme: datetime
+) -> tuple[str, str]:
+    """(vrsta, poruka): zbirna tablica se sprema odmah nakon provjere, bez prepisivanja.
+
+    Nijedna greška ne smije izgubiti rezultat provjere niti prikazati traceback.
+    """
+    try:
+        tablica = zbirna.izradi(rezultat, odabrani, vrijeme.strftime(FORMAT_VREMENA))
+        putanja = excel_izlaz.spremi(
+            excel_izlaz.izradi(tablica), mapa_vjezbe, odabrani.vjezba.id, vrijeme
+        )
+    except Exception as greska:  # noqa: BLE001 — prikazuje se kao poruka, ne traceback
+        razlog = getattr(greska, "strerror", None) or type(greska).__name__
+        return "greska", poruka("batch.tablica_nije_spremljena", razlog=razlog)
+    return "uspjeh", poruka("batch.tablica_spremljena", putanja=str(putanja))
+
+
 def _pokreni_batch(
-    odabrani: profil.Profil, zamrznuti: tuple[Student, ...], mapa: Path, podaci: Path
+    odabrani: profil.Profil,
+    zamrznuti: tuple[Student, ...],
+    mapa: Path,
+    podaci: Path,
+    mapa_vjezbe: Path,
 ) -> None:
+    vrijeme = datetime.now(ZONA)  # vrijeme provjere, ne spremanja
     traka = st.progress(0.0)
 
     def napredak(obradeno: int, ukupno: int) -> None:
@@ -685,19 +708,27 @@ def _pokreni_batch(
         return
     finally:
         traka.empty()
-    st.session_state[KLJUC_BATCH] = (_kljuc_batcha(odabrani, zamrznuti, mapa), rezultat)
+    spremanje = _spremi_tablicu(odabrani, rezultat, mapa_vjezbe, vrijeme)
+    kljuc = _kljuc_batcha(odabrani, zamrznuti, mapa)
+    st.session_state[KLJUC_BATCH] = (kljuc, rezultat, spremanje)
 
 
 def zadnji_batch(
     odabrani: profil.Profil, zamrznuti: tuple[Student, ...] | None, mapa: Path | None
-) -> RezultatBatcha | None:
+) -> tuple[RezultatBatcha, tuple[str, str]] | None:
+    """Zadnji rezultat i ishod spremanja zbirne tablice, ako vrijede za ovaj odabir."""
     spremljeno = st.session_state.get(KLJUC_BATCH)
     if spremljeno is None or spremljeno[0] != _kljuc_batcha(odabrani, zamrznuti, mapa):
         return None
-    return spremljeno[1]
+    return spremljeno[1], spremljeno[2]
 
 
-def prikazi_rezultat_batcha(rezultat: RezultatBatcha) -> None:
+def prikazi_rezultat_batcha(rezultat: RezultatBatcha, spremanje: tuple[str, str]) -> None:
+    vrsta, tekst = spremanje
+    if vrsta == "uspjeh":
+        st.success(tekst, icon="✅")
+    else:
+        st.error(tekst, icon="❌")
     if not rezultat.datoteke:
         st.info(poruka("batch.nema_datoteka"), icon="ℹ️")
         return
@@ -746,10 +777,10 @@ def prikazi_batch(
     if st.button(
         poruka("batch.pokreni"), key="pokreni_batch", type="primary", disabled=not moze
     ) and moze:
-        _pokreni_batch(odabrani, zamrznuti, mapa, podaci)
-    rezultat = zadnji_batch(odabrani, zamrznuti, mapa)
-    if rezultat is not None:
-        prikazi_rezultat_batcha(rezultat)
+        _pokreni_batch(odabrani, zamrznuti, mapa, podaci, mapa_vjezbe)
+    zadnji = zadnji_batch(odabrani, zamrznuti, mapa)
+    if zadnji is not None:
+        prikazi_rezultat_batcha(*zadnji)
 
 
 st.set_page_config(page_title=poruka("nastavnik.naslov"), page_icon="📋")

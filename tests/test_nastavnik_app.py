@@ -1154,3 +1154,42 @@ def test_batch_necitljiva_mapa_prikazuje_gresku(podaci, aplikacija, tmp_path, mo
     at = _pokrenut_batch(aplikacija, podaci, mapa)
     assert not at.exception
     assert poruka("batch.mapa_necitljiva", razlog="Pristup odbijen") in [e.value for e in at.error]
+
+
+# --- Zbirna tablica (priča 4.3) ---------------------------------------------------
+
+
+def test_batch_sprema_zbirnu_tablicu_bez_prepisivanja(podaci, aplikacija, tmp_path):
+    from openpyxl import load_workbook
+
+    mapa = _predaje(tmp_path, profil.ucitaj(VJEZBA_1.read_bytes()))
+    at = _pokrenut_batch(aplikacija, podaci, mapa)
+    prva = _mapa_vjezbe(podaci) / "rezultati_vjezba_1.xlsx"
+    assert poruka("batch.tablica_spremljena", putanja=str(prva)) in [s.value for s in at.success]
+    knjiga = load_workbook(prva)
+    assert knjiga.sheetnames == ["Rezultati", "Nalazi", "Nepovezano"]
+    retci = list(knjiga["Rezultati"].iter_rows(min_row=4, values_only=True))
+    assert [(r[0], r[5]) for r in retci] == [(1, "spremno"), (2, "spremno")]
+    sadrzaj = prva.read_bytes()
+    # Ponovni prikaz bez klika ne sprema novu tablicu, a poruka ostaje.
+    at = at.run().run()
+    assert len(list(_mapa_vjezbe(podaci).glob("rezultati_*.xlsx"))) == 1
+    assert poruka("batch.tablica_spremljena", putanja=str(prva)) in [s.value for s in at.success]
+    at = at.button(key="pokreni_batch").click().run()
+    assert not at.exception
+    spremljene = sorted(p.name for p in _mapa_vjezbe(podaci).glob("rezultati_*.xlsx"))
+    assert len(spremljene) == 2 and prva.read_bytes() == sadrzaj
+
+
+def test_batch_neuspjelo_spremanje_tablice(podaci, aplikacija, tmp_path, monkeypatch):
+    from provjera.adapteri import excel_izlaz
+
+    def zakljucano(*_a, **_k):
+        raise PermissionError(13, "Pristup odbijen")
+
+    monkeypatch.setattr(excel_izlaz, "spremi", zakljucano)
+    mapa = _predaje(tmp_path, profil.ucitaj(VJEZBA_1.read_bytes()))
+    at = _pokrenut_batch(aplikacija, podaci, mapa)
+    assert not at.exception
+    assert poruka("batch.tablica_nije_spremljena", razlog="Pristup odbijen") in [e.value for e in at.error]
+    assert poruka("batch.gotovo", broj=2) in [s.value for s in at.success]

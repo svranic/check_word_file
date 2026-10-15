@@ -5,7 +5,8 @@ a ``pravilo.<ID>`` je naziv pravila. Ostali tekst sučelja grupiran je po prefik
 ``app.``, ``nastavnik.``, ``popis.``, ``privatnost.``, ``profil.``, ``vjezba.``, ``rbr.``,
 ``margine.``, ``naziv.``, ``ulaz.``, ``opce.``, ``status.``, ``izvjestaj.``,
 ``lokacija.``, ``izvor.``, ``sazetak.``, ``poravnanje.``, ``prored.``, ``spremnost.``,
-``samoprovjera.``, ``pdf.``, ``batch.``, ``ukupni_status.``, ``uparivanje.`` i ``vrijednost.``.
+``samoprovjera.``, ``pdf.``, ``batch.``, ``ukupni_status.``, ``uparivanje.``, ``zbirna.`` i
+``vrijednost.``.
 """
 
 from collections.abc import Mapping
@@ -885,6 +886,33 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "batch.odbijeno.prevelika": "datoteka je veća od dopuštene",
         "batch.odbijeno.zip_bomba": "raspakirani sadržaj je prevelik",
         "batch.odbijeno.ostecena": "datoteka je oštećena",
+        "zbirna.vjezba": "Vježba",
+        "zbirna.verzija": "Verzija profila",
+        "zbirna.vrijeme": "Vrijeme provjere",
+        "zbirna.list_rezultati": "Rezultati",
+        "zbirna.list_nalazi": "Nalazi",
+        "zbirna.list_nepovezano": "Nepovezano",
+        "zbirna.stupac_rbr": "Rbr.",
+        "zbirna.stupac_ime": "Ime",
+        "zbirna.stupac_prezime": "Prezime",
+        "zbirna.stupac_jmbag": "JMBAG",
+        "zbirna.stupac_datoteka": "Naziv datoteke",
+        "zbirna.stupac_ukupni_status": "Ukupni status",
+        "zbirna.stupac_broj_nalaza": "Broj nalaza koji ne prolaze",
+        "zbirna.stupac_pravilo": "Pravilo",
+        "zbirna.stupac_status": "Status",
+        "zbirna.stupac_lokacija": "Lokacija",
+        "zbirna.stupac_ocekivano": "Očekivano",
+        "zbirna.stupac_pronadeno": "Pronađeno",
+        "zbirna.stupac_opis": "Opis",
+        "zbirna.stupac_pojave": "Pojave",
+        "zbirna.stupac_razlog": "Razlog",
+        "zbirna.stupac_kandidati": "Kandidati",
+        "batch.tablica_spremljena": "Zbirna tablica spremljena je u: {putanja}",
+        "batch.tablica_nije_spremljena": (
+            "Zbirnu tablicu nije moguće spremiti u podatkovnu mapu ({razlog}). Provjeri "
+            "dopuštenja mape i pokreni provjeru ponovno."
+        ),
         "ukupni_status.SPREMNO": "spremno",
         "ukupni_status.NIJE_SPREMNO": "nije spremno",
         "ukupni_status.ZA_RUCNI_PREGLED": "za ručni pregled",
