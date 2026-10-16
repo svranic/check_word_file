@@ -160,3 +160,8 @@ def test_neuspjela_obrada_ima_redak_razloga():
     assert _list(tablica, "Nalazi").retci == (
         (7, "", "neuspjela obrada", "", "", "", "neočekivana greška pri obradi (RuntimeError)", ""),
     )
+
+
+def test_odbijena_datoteka_nema_broj_nalaza():
+    retci = _po_rbr(_list(izradi(_rezultat(), PROFIL, VRIJEME), "Rezultati"))
+    assert retci[6]["Broj nalaza koji ne prolaze"] == ""

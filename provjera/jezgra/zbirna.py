@@ -43,7 +43,8 @@ def _status_pravila(status: Status | None) -> str:
 
 
 def _broj_ne_prolazi(izvjestaj: Izvjestaj | None) -> Celija:
-    if izvjestaj is None:
+    # Odbijena datoteka nije provjerena: prazno, a ne 0 kao kod ispravnog rada.
+    if izvjestaj is None or izvjestaj.odbijeno is not None:
         return ""
     return sum(n.pojave for n in izvjestaj.nalazi if n.status is Status.NE_PROLAZI)
 

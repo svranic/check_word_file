@@ -1304,3 +1304,50 @@ def test_promjena_primjera_ponistava_samoprovjeru(tmp_path, monkeypatch):
     assert not at.exception
     assert not at.dataframe
     assert "- " + poruka("spremnost.samoprovjera_nije_pokrenuta") in _tekst(at)
+
+
+def test_batch_rezultat_nestaje_kad_se_promijeni_profil(podaci, tmp_path, monkeypatch):
+    datoteke = [("vjezba_1.toml", VJEZBA_1.read_bytes())]
+    _profili(monkeypatch, datoteke)
+    mapa = _predaje(tmp_path, profil.ucitaj(VJEZBA_1.read_bytes()))
+    at = _pokrenut_batch(AppTest.from_file(NASTAVNIK, default_timeout=30).run(), podaci, mapa)
+    assert poruka("batch.gotovo", broj=2) in [s.value for s in at.success]
+    datoteke[0] = (
+        "vjezba_1.toml",
+        _zamijeni(VJEZBA_1.read_bytes(), b'margine = "0,03 cm"', b'margine = "0,02 cm"'),
+    )
+    at = at.run()
+    assert not at.exception
+    assert poruka("batch.gotovo", broj=2) not in [s.value for s in at.success]
+
+
+@pytest.mark.parametrize("unos", ["relativna", "C:\\a\x00b"])
+def test_batch_relativna_ili_neispravna_mapa(podaci, aplikacija, tmp_path, monkeypatch, unos):
+    (tmp_path / "relativna").mkdir()
+    monkeypatch.chdir(tmp_path)
+    at = _batch_aplikacija(aplikacija, podaci)
+    at = at.text_input(key="mapa_predaja").input(unos).run()
+    assert poruka("batch.mapa_neispravna") in [e.value for e in at.error]
+    assert at.button(key="pokreni_batch").disabled
+
+
+def test_batch_tablica_prikazuje_nacin_i_kandidate(podaci, aplikacija, tmp_path):
+    mapa = _predaje(tmp_path, profil.ucitaj(VJEZBA_1.read_bytes()))
+    at = _pokrenut_batch(aplikacija, podaci, mapa)
+    tablica = at.dataframe[-1].value
+    assert list(tablica[poruka("batch.stupac_nacin")]) == [poruka("uparivanje.nacin.TOCAN")] * 2
+    assert list(tablica[poruka("batch.stupac_kandidati")]) == ["", ""]
+
+
+def test_batch_greska_izrade_tablice_ne_gubi_rezultat(podaci, aplikacija, tmp_path, monkeypatch):
+    from provjera.adapteri import excel_izlaz
+
+    def pukni(*_a, **_k):
+        raise ValueError("x")
+
+    monkeypatch.setattr(excel_izlaz, "izradi", pukni)
+    mapa = _predaje(tmp_path, profil.ucitaj(VJEZBA_1.read_bytes()))
+    at = _pokrenut_batch(aplikacija, podaci, mapa)
+    assert not at.exception
+    assert poruka("batch.tablica_nije_spremljena", razlog="ValueError") in [e.value for e in at.error]
+    assert poruka("batch.gotovo", broj=2) in [s.value for s in at.success]

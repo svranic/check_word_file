@@ -273,3 +273,20 @@ def test_batch_nesigurna_datoteka_ne_cita_naslovnicu(tmp_path, monkeypatch):
     monkeypatch.setattr(batch.model, "brojevi_naslovnice", lambda *a: pytest.fail("ne smije parsirati"))
     retci = _pokreni(tmp_path)
     assert {r.nepovezano for r in retci.values()} == {RazlogNepovezanosti.BEZ_PODUDARANJA}
+
+
+def test_batch_docx_ima_prednost_pred_pdf(tmp_path):
+    (tmp_path / "Ana_Horvat_GiG_OG_Vjezba_1.pdf").write_bytes(b"%PDF-1.4")
+    (tmp_path / "ana_horvat_gig_og_vjezba_1 (1).docx").write_bytes(ispravan(1, PROFIL))
+    retci = _pokreni(tmp_path)
+    docx = retci["ana_horvat_gig_og_vjezba_1 (1).docx"]
+    assert (docx.student, docx.nacin) == (ANA, NacinUparivanja.PRIBLIZAN)
+    assert docx.izvjestaj is not None
+    assert retci["Ana_Horvat_GiG_OG_Vjezba_1.pdf"].nepovezano is RazlogNepovezanosti.VISESTRUKO
+
+
+def test_student_bez_slova_ne_rusi_batch(tmp_path):
+    bez_slova = Student(9, "0099999999", "123", "456", True)
+    (tmp_path / "Ana_Horvat_GiG_OG_Vjezba_1.docx").write_bytes(ispravan(1, PROFIL))
+    retci = _pokreni(tmp_path, (ANA, bez_slova))
+    assert retci["Ana_Horvat_GiG_OG_Vjezba_1.docx"].student == ANA

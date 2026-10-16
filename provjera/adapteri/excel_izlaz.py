@@ -25,16 +25,20 @@ FORMAT_OZNAKE = "%Y%m%d-%H%M%S"
 NAJVISE_POKUSAJA = 100
 REDAK_STUPACA = 3  # 1: zaglavlje vježbe, 2: prazno, 3: naslovi stupaca
 NAJVECA_SIRINA = 60
+NAJVECA_DULJINA_CELIJE = 32_767  # granica Excela; dulji tekst Excel prijavljuje kao oštećenje
+ZNAKOVI_FORMULE = ("=", "+", "-", "@", "\t", "\r")
 
 
 def _upisi(list_, redak: int, stupac: int, vrijednost: str | int, podebljano: bool = False) -> None:
     celija = list_.cell(row=redak, column=stupac)
     if isinstance(vrijednost, str):
         # Kontrolni znakovi (iz naziva datoteke ili isječka) nisu dopušteni u .xlsx.
-        vrijednost = ILLEGAL_CHARACTERS_RE.sub("", vrijednost)
+        vrijednost = ILLEGAL_CHARACTERS_RE.sub("", vrijednost)[:NAJVECA_DULJINA_CELIJE]
     celija.value = vrijednost
     if isinstance(vrijednost, str):
         celija.data_type = "s"  # „=1+1“, „@SUM(A1)“ … ostaju tekst, nikad formula
+        if vrijednost.startswith(ZNAKOVI_FORMULE):
+            celija.quotePrefix = True  # ostaje tekst i nakon uređivanja ćelije u Excelu
     if podebljano:
         celija.font = Font(bold=True)
 
@@ -52,6 +56,8 @@ def izradi(tablica: ZbirnaTablica) -> bytes:
             for i, vrijednost in enumerate(redak, start=1):
                 _upisi(list_, r, i, vrijednost)
         list_.freeze_panes = list_.cell(row=REDAK_STUPACA + 1, column=1)
+        zadnji = get_column_letter(max(len(opis.stupci), 1))
+        list_.auto_filter.ref = f"A{REDAK_STUPACA}:{zadnji}{REDAK_STUPACA + len(opis.retci)}"
         for i in range(1, max(len(opis.stupci), len(opis.zaglavlje)) + 1):
             duljine = [len(str(redak[i - 1])) for redak in opis.retci if i <= len(redak)]
             duljine += [len(str(v[i - 1])) for v in (opis.stupci, opis.zaglavlje) if i <= len(v)]

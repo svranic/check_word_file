@@ -1,5 +1,6 @@
 """Lokalna nastavnička aplikacija: priprema vježbe i batch provjera (Epici 3 i 4)."""
 
+import logging
 import os
 import re
 from datetime import datetime
@@ -51,6 +52,8 @@ from provjera.jezgra.samoprovjera import (
     broj_odstupanja,
     ukupno,
 )
+
+log = logging.getLogger(__name__)
 
 KORIJEN = Path(__file__).resolve().parents[1]
 MAPA_PROFILA = KORIJEN / "profili"
@@ -691,6 +694,7 @@ def _spremi_tablicu(
             excel_izlaz.izradi(tablica), mapa_vjezbe, odabrani.vjezba.id, vrijeme
         )
     except Exception as greska:  # noqa: BLE001 — prikazuje se kao poruka, ne traceback
+        log.warning("zbirna tablica nije spremljena (%s)", type(greska).__name__)
         razlog = getattr(greska, "strerror", None) or type(greska).__name__
         return "greska", poruka("batch.tablica_nije_spremljena", razlog=razlog)
     return "uspjeh", poruka("batch.tablica_spremljena", putanja=str(putanja))
@@ -715,6 +719,7 @@ def _pokreni_batch(
     try:
         rezultat = batch.pokreni(mapa, odabrani, zamrznuti, napredak, izuzeto=podaci)
     except OSError as greska:
+        st.session_state.pop(KLJUC_BATCH, None)  # stari rezultat više ne vrijedi
         st.error(
             poruka("batch.mapa_necitljiva", razlog=greska.strerror or type(greska).__name__),
             icon="❌",

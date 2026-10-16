@@ -111,3 +111,22 @@ def test_spremi_bez_slobodnog_imena_ima_razlog(tmp_path, monkeypatch):
     with pytest.raises(FileExistsError) as greska:
         excel_izlaz.spremi(b"x", tmp_path, "vjezba_1", T)
     assert greska.value.strerror
+
+
+def test_tekst_s_prefiksom_formule_ostaje_tekst_i_nakon_uredivanja():
+    knjiga = load_workbook(io.BytesIO(excel_izlaz.izradi(_jedan_list("=1+1", "obican"))))
+    list_ = knjiga["Nalazi"]
+    assert list_["A4"].quotePrefix is True
+    assert not list_["A5"].quotePrefix
+
+
+def test_filtar_na_retku_naslova():
+    knjiga = _knjiga()
+    rezultati = knjiga["Rezultati"]
+    assert rezultati.auto_filter.ref.startswith("A3:")
+    assert rezultati.auto_filter.ref.endswith(str(3 + rezultati.max_row - 3))
+
+
+def test_predug_tekst_se_skracuje_na_granicu_excela():
+    knjiga = load_workbook(io.BytesIO(excel_izlaz.izradi(_jedan_list("x" * 40_000))))
+    assert len(knjiga["Nalazi"]["A4"].value) == excel_izlaz.NAJVECA_DULJINA_CELIJE

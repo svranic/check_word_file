@@ -40,7 +40,7 @@ def stanje_otiska(profil: Profil, mapa_vjezbe: Path) -> StanjeOtiska:
     """Jesu li margine iste kao u izdanom PDF-u sa svojstvima (AD-9)."""
     try:
         izdano = procitaj_izdano(mapa_vjezbe)
-    except GreskaIzdanog:
+    except (GreskaIzdanog, OSError):
         return StanjeOtiska.NECITLJIVO
     if izdano is None:
         return StanjeOtiska.NEMA_IZDANOG
