@@ -672,3 +672,50 @@ def test_procitaj_izdano_neispravno(tmp_path, sadrzaj):
     with pytest.raises(GreskaIzdanog) as greska:
         procitaj_izdano(tmp_path)
     assert greska.value.poruka_kljuc in KATALOG
+
+
+def test_bez_zaglavlja_vise_listova_navodi_najblizi_list():
+    bez_jmbaga = tuple(s for s in ZAGLAVLJE if s != "JMBAG")
+    popis = ucitaj_isvu(_knjiga([("Naslovnica",)], [bez_jmbaga, (1, "Ana", "Horvat", "upisan")]))
+    assert popis.greske == (
+        GreskaRetka(None, "popis.bez_zaglavlja", {"stupci": "JMBAG", "najvise": 50}),
+    )
+
+
+def test_zaglavlje_u_50_retku_se_pronalazi():
+    sadrzaj = izvoz(ISPRAVNI, metapodaci=False)
+    knjiga = openpyxl.load_workbook(io.BytesIO(sadrzaj))
+    knjiga.active.insert_rows(1, 49)
+    izlaz = io.BytesIO()
+    knjiga.save(izlaz)
+    popis = ucitaj_isvu(izlaz.getvalue())
+    assert popis.greske == ()
+    assert len(popis.studenti) == len(ISPRAVNI)
+
+
+def test_zakljucan_zamrznuti_popis_nije_ostecen(tmp_path, monkeypatch):
+    import provjera.adapteri.popis as modul
+
+    putanja = zamrzni(_studenti(ISPRAVNI), tmp_path)
+
+    def zakljucano(*_a, **_k):
+        raise PermissionError(13, "Pristup odbijen")
+
+    monkeypatch.setattr(modul.Path, "read_bytes", zakljucano)
+    with pytest.raises(GreskaZamrznutog) as greska:
+        procitaj_zamrznuti(putanja)
+    assert greska.value.poruka_kljuc == "popis.zamrznuti_zakljucan"
+
+
+def test_zamrzavanje_bez_tvrdih_poveznica_neuspjelo_pisanje_ne_ostavlja_datoteku(tmp_path, monkeypatch):
+    import provjera.adapteri.popis as modul
+
+    monkeypatch.setattr(modul.os, "link", _bez_tvrdih_poveznica)
+
+    def puca(_opisnik):
+        raise OSError("disk je pun")
+
+    monkeypatch.setattr(modul.os, "fsync", puca)
+    with pytest.raises(OSError):
+        zamrzni(_studenti(ISPRAVNI), tmp_path)
+    assert list(tmp_path.iterdir()) == []

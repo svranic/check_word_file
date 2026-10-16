@@ -79,7 +79,7 @@ def izradi_pdf(profil: Profil, studenti: Iterable[svojstva.StudentPopisa]) -> by
                  velicina=VELICINA_PODNASLOVA, podebljano=True)
         pdf.set_font(FONT, size=VELICINA)
         for zahtjev in zahtjevi:
-            pdf.multi_cell(0, VELICINA * 0.5, f"• {zahtjev}", new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(0, VELICINA * 0.5, poruka("pdf.stavka", zahtjev=zahtjev), new_x="LMARGIN", new_y="NEXT")
         pdf.ln(RAZMAK)
 
     _odlomak(pdf, poruka("pdf.tablica_naslov"), velicina=VELICINA_PODNASLOVA, podebljano=True)

@@ -181,3 +181,12 @@ def test_samoprovjera_kljucevi_u_katalogu():
     assert "spremnost.samoprovjera_ne_prolazi" in KATALOG
     assert "spremnost.samoprovjera_nema_skupa" in KATALOG
     assert PROLAZ[0] == RezultatPrimjera("ispravan", frozenset(), frozenset(), StatusPrimjera.PROLAZI)
+
+
+def test_dupli_rbr_znaci_da_margine_nisu_jedinstvene(vjezba):
+    assert _pregled(vjezba, [1, 2, 2], 3).margine_jedinstvene is False
+
+
+@pytest.mark.parametrize("rbrovi", [[], [0, 100000]])
+def test_bez_provjerenog_rbr_jedinstvenost_nije_potvrdena(vjezba, rbrovi):
+    assert _pregled(vjezba, rbrovi, len(rbrovi)).margine_jedinstvene is None

@@ -98,6 +98,9 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "popis.prazno_ime": "Ime je prazno.",
         "popis.prazno_prezime": "Prezime je prazno.",
         "popis.zamrznuti_necitljiv": "Zamrznuti popis nije čitljiva CSV datoteka u UTF-8.",
+        "popis.zamrznuti_zakljucan": (
+            "Zamrznuti popis trenutno se ne može pročitati (je li otvoren u drugom programu?)."
+        ),
         "popis.zamrznuti_prazan": "Zamrznuti popis ne sadrži nijednog studenta.",
         "popis.zamrznuti_zaglavlje": "Zaglavlje mora biti točno: {stupci}.",
         "popis.zamrznuti_broj_stupaca": "Redak ima {pronadeno} stupaca umjesto {ocekivano}.",
@@ -113,6 +116,10 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "nastavnik.zamrznuti_ne_uredivati": (
             "Ne otvaraj i ne spremaj popis.csv u Excelu: spremanje mijenja razdjelnik i briše "
             "vodeće nule JMBAG-a, pa popis postaje neispravan."
+        ),
+        "nastavnik.zamrznuti_zakljucan": (
+            "Zamrznuti popis ({putanja}) trenutno se ne može pročitati. Zatvori ga u drugom "
+            "programu (npr. Excelu) i osvježi stranicu; datoteku ne briši."
         ),
         "nastavnik.zamrznuti_ostecen": (
             "Zamrznuti popis ({putanja}) je oštećen: {poruka} Ispravi ili ukloni datoteku; "
@@ -222,6 +229,7 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         ),
         "samoprovjera.mapa_necitljiva": "Mapa referentnog skupa {mapa} nije čitljiva.",
         "samoprovjera.u_tijeku": "Samoprovjera je u tijeku …",
+        "pdf.stavka": "• {zahtjev}",
         "pdf.naslov": "{naziv} – svojstva za oblikovanje rada",
         "pdf.verzija": "Verzija profila: {verzija}",
         "pdf.poveznica": "Web provjera rada: {poveznica}",
@@ -295,6 +303,14 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "nastavnik.pdf_generirano": (
             "PDF je generiran ({putanja}). Otisak formule i verzija profila zapisani su u "
             "izdano.json. Broj studenata u PDF-u: {broj}."
+        ),
+        "nastavnik.pdf_izrada_neuspjela": (
+            "PDF sa svojstvima nije moguće izraditi. Provjeri pregled spremnosti i "
+            "fontove u mapi provjera/resursi/fontovi pa pokušaj ponovno."
+        ),
+        "nastavnik.pdf_vracanje_neuspjelo": (
+            "Novi PDF ({putanja}) ostao je zapisan, ali zapis o izdavanju nije: prije "
+            "objave generiraj PDF ponovno."
         ),
         "nastavnik.pdf_zapis_neuspio": (
             "PDF nije zapisan. Zatvori PDF ili izdano.json ako je otvoren u drugom programu "

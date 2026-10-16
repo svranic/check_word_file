@@ -318,7 +318,7 @@ def _objavljeni_profili() -> list[Path]:
     return [
         p
         for p in sorted((KORIJEN / "profili").glob("*.toml"))
-        if tomllib.loads(p.read_text(encoding="utf-8-sig"))["vjezba"]["objavljeno"] is True
+        if tomllib.loads(p.read_text(encoding="utf-8-sig")).get("vjezba", {}).get("objavljeno") is True
     ]
 
 

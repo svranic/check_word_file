@@ -90,7 +90,7 @@ def podatkovna_mapa() -> Path:
     if u_repozitoriju:
         st.warning(poruka("nastavnik.mapa_u_repozitoriju"), icon="⚠️")
         st.stop()
-    st.caption(poruka("nastavnik.mapa_odabrana", mapa=str(mapa)))
+    st.caption(poruka("nastavnik.mapa_odabrana", mapa=bez_markdowna(str(mapa))))
     return mapa
 
 
@@ -200,10 +200,14 @@ def prikazi_obavijest() -> None:
 
 
 def opis_greske_zamrznutog(greska: GreskaZamrznutog, putanja: Path) -> str:
+    # Putanja se prikazuje kroz Markdown; ``\`` i ``_`` u Windows putanji ne smiju se izgubiti.
+    putanja_tekst = bez_markdowna(str(putanja))
+    if greska.poruka_kljuc == "popis.zamrznuti_zakljucan":
+        return poruka("nastavnik.zamrznuti_zakljucan", putanja=putanja_tekst)
     tekst = poruka(greska.poruka_kljuc, **greska.parametri)
     if greska.redak is not None:
         tekst = poruka("popis.redak", redak=greska.redak, poruka=tekst)
-    return poruka("nastavnik.zamrznuti_ostecen", putanja=str(putanja), poruka=tekst)
+    return poruka("nastavnik.zamrznuti_ostecen", putanja=putanja_tekst, poruka=tekst)
 
 
 def bez_markdowna(tekst: str) -> str:
@@ -521,40 +525,50 @@ def _procitaj_ako_postoji(putanja: Path) -> bytes | None:
     return putanja.read_bytes() if putanja.exists() else None
 
 
-def _vrati(putanja: Path, prije: bytes | None) -> None:
-    """Vraća datoteku na stanje prije generiranja (najbolje što se može)."""
+def _vrati(putanja: Path, prije: bytes | None) -> bool:
+    """Vraća datoteku na stanje prije generiranja; ``False`` ako ni to nije uspjelo."""
     try:
         if prije is None:
             putanja.unlink(missing_ok=True)
         else:
             zapisi_atomski(putanja, prije)
     except OSError:
-        pass
+        return False
+    return True
 
 
-def _neuspjelo(mapa_vjezbe: Path) -> None:
+def _neuspjelo(mapa_vjezbe: Path, kljuc: str = "nastavnik.pdf_zapis_neuspio") -> None:
     st.session_state.get(KLJUC_PDF, {}).pop(str(mapa_vjezbe), None)
-    st.error(poruka("nastavnik.pdf_zapis_neuspio"), icon="❌")
+    st.error(poruka(kljuc), icon="❌")
 
 
 def _generiraj_pdf(
     odabrani: profil.Profil, zamrznuti: tuple[Student, ...], mapa_vjezbe: Path
 ) -> None:
-    """Sprema ``izdano.json`` pa PDF, oboje ili ništa; zapamćeni PDF vrijedi za ovaj profil,
-    popis i podatkovnu mapu."""
+    """Sprema PDF pa ``izdano.json``, oboje ili ništa; zapamćeni PDF vrijedi za ovaj profil,
+    popis i podatkovnu mapu.
+
+    PDF ide prvi: ako ni vraćanje ne uspije, stari ``izdano.json`` uz novi PDF daje samo
+    upozorenje o razlici, a ne lažnu tvrdnju da je novi profil izdan.
+    """
     putanja = putanja_pdf(mapa_vjezbe, odabrani.vjezba.id)
     izdano = putanja_izdanog(mapa_vjezbe)
     try:
         sadrzaj = izradi_pdf(odabrani, zamrznuti)
-        izdano_prije = _procitaj_ako_postoji(izdano)
-        zapisi_izdano(mapa_vjezbe, odabrani, datetime.now(ZONA))
+    except Exception:  # noqa: BLE001 — fpdf ili Rbr. izvan formule: poruka, ne traceback
+        _neuspjelo(mapa_vjezbe, "nastavnik.pdf_izrada_neuspjela")
+        return
+    try:
+        pdf_prije = _procitaj_ako_postoji(putanja)
+        spremi_pdf(sadrzaj, putanja)
     except OSError:
         _neuspjelo(mapa_vjezbe)
         return
     try:
-        spremi_pdf(sadrzaj, putanja)
+        zapisi_izdano(mapa_vjezbe, odabrani, datetime.now(ZONA))
     except OSError:
-        _vrati(izdano, izdano_prije)
+        if not _vrati(putanja, pdf_prije):
+            st.error(poruka("nastavnik.pdf_vracanje_neuspjelo", putanja=bez_markdowna(str(putanja))), icon="❌")
         _neuspjelo(mapa_vjezbe)
         return
     spremljeni = st.session_state.setdefault(KLJUC_PDF, {})

@@ -189,9 +189,8 @@ def ucitaj_sve(
     pobjednici = {}
     for id_vjezbe, kandidati in po_id.items():
         objavljeni_kandidati = [k for k in kandidati if k[1].vjezba.objavljeno]
-        pobjednici[id_vjezbe] = (
-            objavljeni_kandidati[0][0] if len(objavljeni_kandidati) == 1 else kandidati[0][0]
-        )
+        # Prvi objavljeni, kao što ga dobivaju studenti (``objavljeni``); inače prvi.
+        pobjednici[id_vjezbe] = (objavljeni_kandidati or kandidati)[0][0]
     for i, (ime, ucitano) in enumerate(rezultat):
         if isinstance(ucitano, Profil) and pobjednici[ucitano.vjezba.id] != ime:
             greska = poruka("profil.dupli_id", datoteka=pobjednici[ucitano.vjezba.id])

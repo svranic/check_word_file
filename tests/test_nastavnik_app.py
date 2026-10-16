@@ -2,6 +2,7 @@
 
 import io
 import json
+import re
 import shutil
 import sys
 from datetime import datetime
@@ -349,6 +350,11 @@ def _zamrzni_unaprijed(podaci: Path, retci=ISPRAVNI) -> Path:
     return zamrzni(ucitaj_isvu(izvoz(retci)).studenti, podaci / "vjezba_1")
 
 
+def _md(tekst: str) -> str:
+    """Kao ``bez_markdowna`` u aplikaciji: putanja se prikazuje s escapiranim znakovima."""
+    return re.sub(r"([\\`*_{}\[\]()#+\-.!|>~$:<])", r"\\\1", tekst)
+
+
 def _tekst(at: AppTest) -> str:
     return "\n".join(m.value for m in at.markdown)
 
@@ -498,7 +504,7 @@ def test_ostecen_popis_prikazuje_poruku_s_retkom(podaci, aplikacija):
     assert not at.exception
     redak = poruka("popis.redak", redak=2, poruka=poruka("popis.rbr_neispravan"))
     assert [e.value for e in at.error] == [
-        poruka("nastavnik.zamrznuti_ostecen", putanja=str(putanja), poruka=redak)
+        poruka("nastavnik.zamrznuti_ostecen", putanja=_md(str(putanja)), poruka=redak)
     ]
     assert not at.file_uploader  # ništa se ne može zamrznuti ni primijeniti preko oštećenog
 
@@ -546,7 +552,7 @@ def test_ostecen_popis_izmedu_prikaza_i_primjene(podaci, aplikacija):
     zaglavlje = poruka("popis.zamrznuti_zaglavlje", stupci="rbr,jmbag,ime,prezime,aktivan")
     ocekivano = poruka(
         "nastavnik.zamrznuti_ostecen",
-        putanja=str(putanja),
+        putanja=_md(str(putanja)),
         poruka=poruka("popis.redak", redak=1, poruka=zaglavlje),
     )
     assert ocekivano in _greske(at)
@@ -931,7 +937,7 @@ def test_pdf_neuspjelo_pisanje_izdanog_cuva_prethodni_par(podaci, aplikacija, mo
     def pukni(*_args):
         raise OSError("disk pun")
 
-    monkeypatch.setattr(popis_modul, "zapisi_atomski", pukni)
+    monkeypatch.setattr(popis_modul, "zapisi_izdano", pukni)
     at = at.button(key="generiraj_pdf").click().run()
     assert not at.exception
     assert [e.value for e in at.error] == [poruka("nastavnik.pdf_zapis_neuspio")]
@@ -940,9 +946,53 @@ def test_pdf_neuspjelo_pisanje_izdanog_cuva_prethodni_par(podaci, aplikacija, mo
     assert not at.get("download_button")
 
 
+def test_pdf_neuspjelo_vracanje_upozorava(podaci, aplikacija, monkeypatch):
+    at = _generiran_pdf(podaci, aplikacija)
+    mapa = _mapa_vjezbe(podaci)
+    izdano_prije = (mapa / "izdano.json").read_bytes()
+
+    def pukni(*_args):
+        raise OSError("disk pun")
+
+    # PDF se zapiše, a ni zapis o izdavanju ni vraćanje PDF-a ne uspiju.
+    monkeypatch.setattr(popis_modul, "zapisi_izdano", pukni)
+    monkeypatch.setattr(popis_modul, "zapisi_atomski", pukni)
+    at = at.button(key="generiraj_pdf").click().run()
+    assert not at.exception
+    greske = [e.value for e in at.error]
+    assert greske[-1] == poruka("nastavnik.pdf_zapis_neuspio")
+    assert greske[0].startswith("Novi PDF (")
+    assert (mapa / "izdano.json").read_bytes() == izdano_prije
+
+
+def test_pdf_greska_izrade_ne_rusi_stranicu(podaci, aplikacija, monkeypatch):
+    spremi(_popis_za_pdf(), _popis_csv(podaci))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    at = _samoprovjera(at)
+
+    def pukni(*_args):
+        raise ValueError("Rbr. izvan formule")
+
+    monkeypatch.setattr(pdf_svojstva, "izradi_pdf", pukni)
+    at = at.button(key="generiraj_pdf").click().run()
+    assert not at.exception
+    assert [e.value for e in at.error] == [poruka("nastavnik.pdf_izrada_neuspjela")]
+    assert not (_mapa_vjezbe(podaci) / "izdano.json").exists()
+
+
+def test_pdf_nije_izdano_dok_nema_izdanog(podaci, aplikacija):
+    spremi(_popis_za_pdf(), _popis_csv(podaci))
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    assert poruka("nastavnik.pdf_nije_izdano") in [c.value for c in at.caption]
+    at = _generiran_pdf(podaci, aplikacija)
+    assert poruka("nastavnik.pdf_nije_izdano") not in [c.value for c in at.caption]
+
+
 def test_pdf_neuspjelo_pisanje_pdf_vraca_prethodni_izdano(podaci, aplikacija, monkeypatch):
     at = _generiran_pdf(podaci, aplikacija)
     mapa = _mapa_vjezbe(podaci)
+    # Vrijeme različito od novog generiranja, da test ne prolazi slučajno u istoj sekundi.
+    zapisi_izdano(mapa, profil.ucitaj(VJEZBA_1.read_bytes()), datetime(2026, 10, 1, 9, 5, tzinfo=ZONA))
     pdf_prije = (mapa / "svojstva_vjezba_1.pdf").read_bytes()
     izdano_prije = (mapa / "izdano.json").read_bytes()
 
@@ -1193,3 +1243,64 @@ def test_batch_neuspjelo_spremanje_tablice(podaci, aplikacija, tmp_path, monkeyp
     assert not at.exception
     assert poruka("batch.tablica_nije_spremljena", razlog="Pristup odbijen") in [e.value for e in at.error]
     assert poruka("batch.gotovo", broj=2) in [s.value for s in at.success]
+
+
+def test_dupli_id_nacrt_prvi_zadrzava_prvi_objavljeni_kao_studenti():
+    nacrt = _toml("vjezba_1", "Nacrt", False)
+    prvi = _toml("vjezba_1", "Prvi", True)
+    drugi = _toml("vjezba_1", "Drugi", True)
+    datoteke = [("a.toml", nacrt), ("b.toml", prvi), ("c.toml", drugi)]
+    rezultat = dict(profil.ucitaj_sve(datoteke))
+    assert isinstance(rezultat["b.toml"], profil.Profil)
+    studentima, _ = profil.objavljeni([s for _, s in datoteke])
+    assert [p.vjezba.naziv for p in studentima] == [rezultat["b.toml"].vjezba.naziv]
+
+
+def test_broj_studenata_u_popisu(u_mapi):
+    at = _ucitaj(u_mapi, izvoz(ISPRAVNI))
+    assert poruka("popis.broj_studenata", broj=len(ISPRAVNI)) in _tekst(at)
+
+
+def test_neuspjela_primjena_prikazuje_poruku(podaci, aplikacija, monkeypatch):
+    _zamrzni_unaprijed(podaci)
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    at = _ucitaj(at, izvoz(KASNI_UPIS))
+    prije = _popis_csv(podaci).read_bytes()
+
+    def zakljucano(*_a, **_k):
+        raise PermissionError(13, "Pristup odbijen")
+
+    monkeypatch.setattr(popis_modul.os, "replace", zakljucano)
+    at = at.button(key="primijeni").click().run()
+    assert not at.exception
+    assert poruka("nastavnik.zapis_neuspio") in [e.value for e in at.error]
+    assert _popis_csv(podaci).read_bytes() == prije
+
+
+def test_zakljucan_zamrznuti_popis_ne_savjetuje_brisanje(podaci, aplikacija, monkeypatch):
+    putanja = _zamrzni_unaprijed(podaci)
+    pravi = Path.read_bytes
+
+    def citaj(self):
+        if self.name == "popis.csv":
+            raise PermissionError(13, "Pristup odbijen")
+        return pravi(self)
+
+    monkeypatch.setattr(Path, "read_bytes", citaj)
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
+    assert not at.exception
+    assert [e.value for e in at.error] == [
+        poruka("nastavnik.zamrznuti_zakljucan", putanja=_md(str(putanja)))
+    ]
+
+
+def test_promjena_primjera_ponistava_samoprovjeru(tmp_path, monkeypatch):
+    mapa = _privremeni_skup(tmp_path, monkeypatch)
+    at = _samoprovjera(AppTest.from_file(NASTAVNIK, default_timeout=60).run())
+    assert poruka("samoprovjera.prolazi") in [s.value for s in at.success]
+    primjer = next(mapa.glob("*.docx"))
+    primjer.write_bytes(primjer.read_bytes() + b"\0")
+    at = at.run()
+    assert not at.exception
+    assert not at.dataframe
+    assert "- " + poruka("spremnost.samoprovjera_nije_pokrenuta") in _tekst(at)

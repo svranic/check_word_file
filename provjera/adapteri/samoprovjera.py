@@ -12,6 +12,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 from provjera.jezgra.nalaz import KontekstProvjere, Status
+from provjera.jezgra.poruke import poruka
 from provjera.jezgra.pravila import REGISTAR
 from provjera.jezgra.profil import Profil
 from provjera.jezgra.provjera import provjeri, status_pravila
@@ -153,7 +154,7 @@ def pokreni(profil: Profil, mapa_referentnog: Path) -> tuple[RezultatPrimjera, .
             continue
         if isinstance(pronadeno, str):
             rezultati.append(
-                neuspjeli(ime, ocekivano[ime], "samoprovjera.odbijeno", {"razlog": pronadeno})
+                neuspjeli(ime, ocekivano[ime], "samoprovjera.odbijeno", {"razlog": poruka(f"batch.odbijeno.{pronadeno}")})
             )
         else:
             rezultati.append(usporedi(ime, ocekivano[ime], pronadeno, ukljucena))

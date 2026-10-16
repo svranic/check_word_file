@@ -104,6 +104,10 @@ def pregled(
                 )
             else:
                 vidjene[margine] = rbr
+        if dupli:
+            margine_jedinstvene = False  # isti Rbr. dvaput znači iste margine
+        elif not vidjene:
+            margine_jedinstvene = None  # nijedan Rbr. nije provjeren
     ukljucenih = sum(p.ukljuceno for p in profil.pravila.values())
     if not ukljucenih:
         problemi.append(Problem("spremnost.nema_pravila"))

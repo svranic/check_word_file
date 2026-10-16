@@ -396,8 +396,10 @@ def procitaj_zamrznuti(putanja: Path) -> tuple[Student, ...]:
     """Čita i provjerava ``popis.csv``; neispravna datoteka baca ``GreskaZamrznutog``."""
     try:
         tekst = putanja.read_bytes().decode(KODIRANJE)
-    except (OSError, UnicodeDecodeError) as greska:
+    except (FileNotFoundError, UnicodeDecodeError) as greska:
         raise GreskaZamrznutog(None, "popis.zamrznuti_necitljiv") from greska
+    except OSError as greska:  # npr. datoteka zaključana u Excelu
+        raise GreskaZamrznutog(None, "popis.zamrznuti_zakljucan") from greska
 
     citac = csv.reader(io.StringIO(tekst, newline=""), strict=True)
     studenti: list[Student] = []
