@@ -1,0 +1,118 @@
+# Profil zadatka za Vježbu 1 (Osnove geoinformatike). Bez osobnih podataka.
+# Mjere se pišu kao tekst s jedinicom: "3 cm", "25 mm", "12 pt".
+
+[vjezba]
+id = "vjezba_1"
+naziv = "Vježba 1"
+objavljeno = true
+# Adresa web provjere za studente (objavljuje se u PDF-u sa svojstvima); obavezna, https.
+# Privremena adresa: nastavnik je zamjenjuje stvarnom adresom aplikacije prije objave.
+poveznica = "https://provjera-word.streamlit.app/"
+
+[naziv_datoteke]
+sufiks = "_GiG_OG_Vjezba_1"
+nastavak = ".docx"
+
+[formula]
+# Osnovice margina sekcija tijela; individualni pomak je ± raspon u koracima.
+osnovica_gore = "2,5 cm"
+osnovica_dolje = "2,5 cm"
+osnovica_lijevo = "3 cm"
+osnovica_desno = "2,5 cm"
+raspon = "0,5 cm"
+korak = "0,1 cm"
+# Margine naslovnice (iste za sve studente); ta kombinacija nikad nije individualna.
+naslovnica = "2,5 cm"
+# Novo sjeme daje novi raspored margina za sljedeću vježbu.
+sjeme = 20261012
+
+[tolerancije]
+# Mora biti manja od pola koraka formule.
+margine = "0,03 cm"
+# Dopušteno odstupanje veličine stranice (A4).
+stranica = "0,1 cm"
+
+[uloge]
+# Nazivi se uspoređuju bez obzira na velika i mala slova, dijakritike i završnu
+# interpunkciju („UVOD:“ = „Uvod“); ručni broj („1.“) se zanemaruje.
+sazetak = "Sažetak"
+literatura = "Literatura"
+poglavlja = ["Uvod", "Studij geodezije i geomatike u Varaždinu", "Zaključak", "Literatura"]
+
+[pravila.R-NAZIV]
+ukljuceno = true
+
+[pravila.R-SEKCIJE]
+ukljuceno = true
+
+[pravila.R-MARGINE]
+ukljuceno = true
+sirina_stranice = "21 cm"
+visina_stranice = "29,7 cm"
+
+[pravila.R-TEKST]
+ukljuceno = true
+# Stil se zadaje ugrađenim imenom neovisno o jeziku Worda (npr. "Normal").
+stil = "Normal"
+font = "Calibri"
+velicina = "12 pt"
+# lijevo | sredina | desno | obostrano
+poravnanje = "obostrano"
+razmak_ispred = "6 pt"
+razmak_iza = "6 pt"
+# Višestruki prored u retcima: "1" je jednostruko.
+prored = "1"
+
+[pravila.R-NASLOVI]
+ukljuceno = true
+# Naslovi poglavlja iz [uloge] poglavlja. Stil se mora zadati ugrađenim engleskim imenom
+# ("Heading 1"); lokalizirano ime („Naslov 1“) ovdje ne odgovara. U dokumentu vrijedi i „Naslov 1“.
+stil = "Heading 1"
+font = "Calibri"
+podebljano = true
+velicina = "12 pt"
+# lijevo | sredina | desno | obostrano
+poravnanje = "lijevo"
+razmak_ispred = "6 pt"
+razmak_iza = "6 pt"
+# Wordova numeracija naslova; {n} je redni broj naslova u stilu iz profila, redom u dokumentu.
+oznaka = "{n}."
+
+[pravila.R-SAZETAK]
+ukljuceno = true
+# Odlomci sažetka (između naslova „Sažetak“ i prvog poglavlja); smiju imati vlastiti stil,
+# provjeravaju se efektivne vrijednosti.
+font = "Calibri"
+velicina = "12 pt"
+# lijevo | sredina | desno | obostrano
+poravnanje = "obostrano"
+uvlaka_lijevo = "3,5 cm"
+uvlaka_desno = "3,5 cm"
+# Dopušteno odstupanje uvlaka: Word 3,5 cm zapisuje kao 1984 ili 1985 twipsa.
+tolerancija = "0,03 cm"
+
+[pravila.R-LITERATURA]
+ukljuceno = true
+# Stavke literature (odlomci ispod naslova „Literatura“); vlastiti stil je dopušten.
+font = "Calibri"
+velicina = "12 pt"
+
+[pravila.R-STILOVI]
+# Osnovni tekst i naslovi bez ručnog oblikovanja; ciljnih vrijednosti nema.
+ukljuceno = true
+
+[pravila.R-BROJ-STRANICE]
+ukljuceno = true
+# Wordovo polje broja stranice (Umetanje (Insert) → Broj stranice (Page Number)) u podnožju
+# svake sekcije rada; naslovnica nema broj. Provjerava se font i veličina samog broja.
+font = "Calibri"
+velicina = "10 pt"
+
+[pravila.R-PROMJENE]
+# Neprihvaćene praćene promjene; ostala pravila procjenjuju prihvaćeno stanje.
+ukljuceno = true
+
+[pravila.R-OKVIRI]
+# Naslovi poglavlja i osnovni tekst (barem 40 znakova; granica je fiksna u kodu) ne smiju biti
+# u tekstnim okvirima ni oblicima u tijelu rada; kratke oznake su dopuštene, naslovnica se ne provjerava.
+ukljuceno = true

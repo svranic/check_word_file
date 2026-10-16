@@ -56,9 +56,11 @@ def potvrdi_rbr() -> None:
     )
 
 
-def prikazi_margine(odabrani: profil.Profil, broj: int) -> None:
+def prikazi_margine(odabrani: profil.Profil, broj: int | None) -> None:
+    """Margine tijela za Rbr.; uz fiksne margine (``broj`` je ``None``) iste za sve."""
+    fiksne = odabrani.formula.fiksne_margine
     margine = formula.margine(broj, odabrani.formula).u_twips()
-    st.subheader(poruka("margine.naslov"))
+    st.subheader(poruka("margine.naslov_fiksne" if fiksne else "margine.naslov"))
     for stupac, strana in zip(st.columns(4), ("gore", "dolje", "lijevo", "desno")):
         stupac.metric(poruka(f"margine.{strana}"), formatiraj(margine[strana], Jedinica.TWIPS))
     st.write(poruka("margine.uputa"))
@@ -66,7 +68,8 @@ def prikazi_margine(odabrani: profil.Profil, broj: int) -> None:
     st.caption(
         poruka("margine.naslovnica", naslovnica=formatiraj(naslovnica, Jedinica.TWIPS))
     )
-    st.caption(poruka("margine.usporedi"))
+    if not fiksne:
+        st.caption(poruka("margine.usporedi"))
     st.write(poruka("naziv.obrazac", obrazac=odabrani.naziv_datoteke.obrazac))
 
 
@@ -75,7 +78,7 @@ def bez_markdowna(tekst: str) -> str:
     return re.sub(r"([\\`*_{}\[\]()#+\-.!|>~$:])", r"\\\1", tekst)
 
 
-def ucitaj_dokument(odabrani: profil.Profil, broj: int) -> None:
+def ucitaj_dokument(odabrani: profil.Profil, broj: int | None) -> None:
     datoteka = st.file_uploader(
         poruka("ulaz.oznaka"),
         key=f"datoteka_{st.session_state.get('polje_ucitavanja', 0)}",
@@ -147,7 +150,11 @@ def ponudi_sazetak(izvjestaj: Izvjestaj, odabrani: profil.Profil) -> None:
     st.download_button(
         poruka("sazetak.preuzmi"),
         data=html_sazetka(izvjestaj, odabrani.vjezba.naziv, vrijeme).encode("utf-8"),
-        file_name=poruka("sazetak.datoteka", rbr=izvjestaj.rbr),
+        file_name=(
+            poruka("sazetak.datoteka_bez_rbr")
+            if izvjestaj.rbr is None
+            else poruka("sazetak.datoteka", rbr=izvjestaj.rbr)
+        ),
         mime="text/html",
     )
 
@@ -202,6 +209,12 @@ id_vjezbe = st.selectbox(
     on_change=ocisti_provjeru,
 )
 odabrani = po_id[id_vjezbe]
+
+if odabrani.formula.fiksne_margine:
+    # Iste margine za sve studente: Rbr. nije potreban, odmah se nudi učitavanje.
+    prikazi_margine(odabrani, None)
+    ucitaj_dokument(odabrani, None)
+    st.stop()
 
 with st.form("rbr_obrazac"):
     st.text_input(poruka("rbr.oznaka"), key="rbr_unos", placeholder=poruka("rbr.primjer"))

@@ -29,6 +29,8 @@ Uredi ili kopiraj `profili/vjezba_1.toml`. Za novu vježbu promijeni `id`, `nazi
 
 Ako profil ima grešku, aplikacija prikazuje sve greške i ne dopušta nastavak.
 
+**Fiksne margine.** Ako svi studenti trebaju imati iste margine, u odjeljak `[formula]` dodaj `fiksne_margine = true`. Margine sekcija rada nakon naslovnice tada su osnovice iz profila (`osnovica_gore`, `osnovica_dolje`, `osnovica_lijevo`, `osnovica_desno`), a `raspon`, `korak` i `sjeme` nisu potrebni. Student na web provjeri ne upisuje Rbr., nego odmah vidi margine i učitava rad. PDF navodi margine u zajedničkim zahtjevima, a tablica ima samo Rbr., ime, prezime i naziv datoteke. Spremnost ne provjerava jedinstvenost margina, ali popis i dalje treba zamrznuti jer batch po njemu uparuje datoteke.
+
 ### 2. Podatkovna mapa
 
 Na vrhu stranice upiši mapu u koju se spremaju podaci (zadano `~/ProvjeraWord`). Mapa **ne smije biti unutar repozitorija**, jer sadrži osobne podatke studenata. Za svaku vježbu nastaje podmapa, npr. `ProvjeraWord/vjezba_1/`.

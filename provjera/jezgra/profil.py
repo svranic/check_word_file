@@ -113,6 +113,9 @@ class Profil(_Odjeljak):
 
     @model_validator(mode="after")
     def _tolerancija_manja_od_pola_koraka(self) -> "Profil":
+        # Uz fiksne margine nema koraka: svi studenti imaju iste margine tijela.
+        if self.formula.fiksne_margine:
+            return self
         if 2 * self.tolerancije.margine >= jedinice.mm_u_twips(self.formula.korak):
             raise ValueError("tolerancije.margine mora biti manja od pola koraka formule")
         return self

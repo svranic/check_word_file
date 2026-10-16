@@ -483,7 +483,9 @@ def prikazi_spremnost(
         else samoprovjera
     )
     rezultat = spremnost.pregled(odabrani, rbrovi, aktivnih, rezultati)
-    if rezultat.margine_jedinstvene is None:
+    if odabrani.formula.fiksne_margine:
+        margine = poruka("spremnost.margine_fiksne")
+    elif rezultat.margine_jedinstvene is None:
         margine = poruka("spremnost.margine_neprovjerene")
     elif rezultat.margine_jedinstvene:
         margine = "✅ " + poruka("spremnost.margine_jedinstvene")

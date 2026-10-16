@@ -1,9 +1,12 @@
-"""Formula margina (FR-4, AD-7): jedini izvor individualnih margina za web, PDF i batch.
+"""Formula margina (FR-4, AD-7): jedini izvor margina tijela za web, PDF i batch.
 
 Svaka margina je osnovica + (znamenka − raspon/korak) · korak, gdje su znamenke
 indeksa kombinacije ``k`` zapisanog u bazi ``v`` (broj vrijednosti po margini).
 Permutacija ``k_i = (a·i + b) mod N`` izvedena iz sjemena jamči jedinstvenost;
 Rbr. n dobiva n-tu dopuštenu kombinaciju.
+
+Uz ``fiksne_margine = true`` svi studenti dobivaju osnovice, a ``raspon``, ``korak`` i
+``sjeme`` smiju izostati.
 """
 
 import hashlib
@@ -12,7 +15,16 @@ from dataclasses import dataclass, fields
 from functools import lru_cache
 from math import gcd
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    StrictBool,
+    StrictInt,
+    model_serializer,
+    model_validator,
+)
 
 from provjera.jezgra import jedinice
 from provjera.jezgra.tipovi import DuljinaMm
@@ -30,28 +42,56 @@ class ParametriFormule(BaseModel):
     osnovica_dolje: DuljinaMm
     osnovica_lijevo: DuljinaMm
     osnovica_desno: DuljinaMm
-    raspon: DuljinaMm
-    korak: DuljinaMm
+    raspon: DuljinaMm | None = None
+    korak: DuljinaMm | None = None
     naslovnica: DuljinaMm
-    sjeme: StrictInt = Field(ge=0)
+    sjeme: StrictInt | None = Field(default=None, ge=0)
+    # Iste margine tijela (osnovice) za sve studente; zadano su individualne.
+    fiksne_margine: StrictBool = False
 
     @model_validator(mode="after")
     def _provjeri_odnose(self) -> "ParametriFormule":
         greske = []
-        if self.korak <= 0:
-            greske.append("korak mora biti veći od 0")
-        elif self.raspon <= 0 or self.raspon % self.korak:
-            greske.append("raspon mora biti pozitivan višekratnik koraka")
-        elif (2 * (self.raspon // self.korak) + 1) ** 4 > NAJVISE_KOMBINACIJA:
-            greske.append(f"raspon/korak daje više od {NAJVISE_KOMBINACIJA} kombinacija")
+        if self.fiksne_margine:
+            najmanje = 0
+        else:
+            for polje in ("raspon", "korak", "sjeme"):
+                if getattr(self, polje) is None:
+                    greske.append(f"{polje} je obavezan kad margine nisu fiksne")
+            if greske:
+                raise ValueError("; ".join(greske))
+            najmanje = self.raspon
+            if self.korak <= 0:
+                greske.append("korak mora biti veći od 0")
+            elif self.raspon <= 0 or self.raspon % self.korak:
+                greske.append("raspon mora biti pozitivan višekratnik koraka")
+            elif (2 * (self.raspon // self.korak) + 1) ** 4 > NAJVISE_KOMBINACIJA:
+                greske.append(f"raspon/korak daje više od {NAJVISE_KOMBINACIJA} kombinacija")
         for strana in ("gore", "dolje", "lijevo", "desno"):
-            if getattr(self, f"osnovica_{strana}") - self.raspon <= 0:
-                greske.append(f"osnovica_{strana} mora biti veća od raspona")
+            if getattr(self, f"osnovica_{strana}") - najmanje <= 0:
+                greske.append(
+                    f"osnovica_{strana} mora biti veća od raspona"
+                    if not self.fiksne_margine
+                    else f"osnovica_{strana} mora biti veća od 0"
+                )
         if self.naslovnica <= 0:
             greske.append("naslovnica mora biti veća od 0")
         if greske:
             raise ValueError("; ".join(greske))
         return self
+
+    @model_serializer(mode="wrap")
+    def _bez_zadanih(self, handler: SerializerFunctionWrapHandler) -> dict:
+        """Izostavlja ``fiksne_margine = false``, a ``raspon``/``korak``/``sjeme`` kad su
+        prazni ili kad su margine fiksne (tada se ne koriste). Profil bez zastavice tako ima
+        isti ``otisak`` i ``profil.verzija`` kao prije njezina uvođenja (AD-9)."""
+        podaci = handler(self)
+        if not self.fiksne_margine:
+            podaci.pop("fiksne_margine", None)
+        for polje in ("raspon", "korak", "sjeme"):
+            if self.fiksne_margine or podaci.get(polje) is None:
+                podaci.pop(polje, None)
+        return podaci
 
 
 def kanonski_json(podaci: object) -> bytes:
@@ -120,11 +160,19 @@ def _dopustene(parametri: ParametriFormule) -> tuple[Margine, ...]:
     return tuple(rezultat)
 
 
-def najveci_rbr(parametri: ParametriFormule) -> int:
+def najveci_rbr(parametri: ParametriFormule) -> int | None:
+    """Najveći Rbr. s individualnim marginama; ``None`` uz fiksne margine (bez granice)."""
+    if parametri.fiksne_margine:
+        return None
     return len(_dopustene(parametri))
 
 
-def margine(rbr: int, parametri: ParametriFormule) -> Margine:
+def margine(rbr: int | None, parametri: ParametriFormule) -> Margine:
+    """Margine tijela za Rbr.; uz fiksne margine osnovice za svaki Rbr. i za ``None``."""
+    if parametri.fiksne_margine:
+        return Margine(*_osnovice(parametri))
+    if rbr is None:
+        raise ValueError("Rbr. je obavezan kad margine nisu fiksne")
     dopustene = _dopustene(parametri)
     if not 1 <= rbr <= len(dopustene):
         raise ValueError(f"Rbr. mora biti između 1 i {len(dopustene)}")

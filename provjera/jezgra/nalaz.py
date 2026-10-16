@@ -94,10 +94,14 @@ class NacinUparivanja(Enum):
 
 @dataclass(frozen=True)
 class KontekstProvjere:
-    """Web šalje ``None``/``None``; batch uvijek popunjava oba zadnja polja (AD-1)."""
+    """Web šalje ``None``/``None``; batch uvijek popunjava oba zadnja polja (AD-1).
+
+    ``rbr`` je ``None`` samo u web provjeri vježbe s fiksnim marginama; batch uvijek
+    šalje stvarni Rbr.
+    """
 
     naziv_datoteke: str
-    rbr: int
+    rbr: int | None
     ocekivani_naziv: str | None
     nacin_uparivanja: NacinUparivanja | None
 
@@ -111,4 +115,4 @@ class Izvjestaj:
     odbijeno: RazlogOdbijanja | None
     nalazi: tuple[Nalaz, ...]
     profil_verzija: str
-    rbr: int
+    rbr: int | None  # None: web provjera vježbe s fiksnim marginama

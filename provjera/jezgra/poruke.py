@@ -178,6 +178,10 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "spremnost.margine_neprovjerene": (
             "Jedinstvenost margina nije provjerena jer nema zamrznutog popisa."
         ),
+        "spremnost.margine_fiksne": (
+            "Margine su fiksne: sve sekcije rada nakon naslovnice imaju iste margine "
+            "za sve studente."
+        ),
         "spremnost.spremno": "spremno",
         "spremnost.nije_spremno": "nije spremno – problemi: {broj}",
         "spremnost.nema_popisa": "Nema zamrznutog popisa studenata za ovu vježbu.",
@@ -238,11 +242,21 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "a sekcijama rada nakon naslovnice postavi svoje margine. Prije predaje provjeri rad "
             "na web provjeri: upiši svoj Rbr. i usporedi margine koje ondje vidiš s ovom tablicom."
         ),
+        "pdf.uputa_fiksne": (
+            "Pronađi svoj redak u tablici i datoteku nazovi točno kao u stupcu „Naziv datoteke“. "
+            "Margine su iste za sve studente i navedene su u zajedničkim zahtjevima. "
+            "Prije predaje provjeri rad na web provjeri."
+        ),
         "pdf.privatnost": "Napomena o obradi: {obrada}",
         "pdf.zajednicki_naslov": "Zajednički zahtjevi (isti za sve studente)",
         "pdf.zahtjev": "{naziv}: {svojstva}.",
         "pdf.razdjelnik": ", ",
         "pdf.naslovnica": "Margine naslovnice",
+        "pdf.margine_tijela": "Margine sekcija rada nakon naslovnice",
+        "pdf.opis.margine_tijela": (
+            "gore {gore}, dolje {dolje}, lijevo {lijevo}, desno {desno} (iste za sve studente)"
+        ),
+        "pdf.opis.naslovnica_fiksne": "{naslovnica} sa svih strana",
         "pdf.opis.naslovnica": (
             "{naslovnica} sa svih strana "
             "(individualne margine iz tablice vrijede za sekcije rada nakon naslovnice)"
@@ -281,6 +295,7 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         "pdf.svojstvo.uvlaka_lijevo": "uvlaka lijevo {vrijednost}",
         "pdf.svojstvo.uvlaka_desno": "uvlaka desno {vrijednost}",
         "pdf.tablica_naslov": "Individualna svojstva studenata",
+        "pdf.tablica_naslov_fiksne": "Nazivi datoteka studenata",
         "pdf.tablica_opis": "Margine vrijede za sve sekcije rada nakon naslovnice.",
         "pdf.stupac_rbr": "Rbr.",
         "pdf.stupac_ime": "Ime",
@@ -355,6 +370,9 @@ KATALOG: Mapping[str, str] = MappingProxyType(
             "Provjeri broj u PDF-u sa svojstvima."
         ),
         "margine.naslov": "Tvoje margine za sekcije rada nakon naslovnice",
+        "margine.naslov_fiksne": (
+            "Margine za sekcije rada nakon naslovnice (iste za sve studente)"
+        ),
         "margine.gore": "Gore (Top)",
         "margine.dolje": "Dolje (Bottom)",
         "margine.lijevo": "Lijevo (Left)",
@@ -980,6 +998,7 @@ KATALOG: Mapping[str, str] = MappingProxyType(
         ),
         "sazetak.preuzmi": "Preuzmi sažetak",
         "sazetak.datoteka": "sazetak_provjere_rbr_{rbr}.html",
+        "sazetak.datoteka_bez_rbr": "sazetak_provjere.html",
         "lokacija.DOKUMENT": "Dokument",
         "lokacija.NAZIV": "Naziv datoteke",
         "lokacija.TIJELO": "Tijelo dokumenta",

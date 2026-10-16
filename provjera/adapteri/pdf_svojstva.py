@@ -27,6 +27,9 @@ RAZMAK = 2  # mm između odlomaka
 # Relativne širine stupaca: Rbr., ime, prezime, naziv datoteke, četiri margine.
 SIRINE_STUPACA = (10, 26, 30, 72, 15, 15, 15, 15)
 STUPCI = ("rbr", "ime", "prezime", "naziv", "gore", "dolje", "lijevo", "desno")
+PORAVNANJE = ("RIGHT", "LEFT", "LEFT", "LEFT", "RIGHT", "RIGHT", "RIGHT", "RIGHT")
+# Uz fiksne margine tablica ima samo prva četiri stupca (margine su u zajedničkim zahtjevima).
+STUPACA_BEZ_MARGINA = 4
 
 
 class _Dokument(FPDF):
@@ -70,7 +73,8 @@ def izradi_pdf(profil: Profil, studenti: Iterable[svojstva.StudentPopisa]) -> by
     _odlomak(pdf, poruka("pdf.verzija", verzija=profil_modul.verzija(profil)))
     _odlomak(pdf, poruka("pdf.poveznica", poveznica=profil.vjezba.poveznica),
              poveznica=profil.vjezba.poveznica)
-    _odlomak(pdf, poruka("pdf.uputa"))
+    fiksne = profil.formula.fiksne_margine
+    _odlomak(pdf, poruka("pdf.uputa_fiksne" if fiksne else "pdf.uputa"))
     _odlomak(pdf, poruka("pdf.privatnost", obrada=poruka("privatnost.obrada")))
 
     zahtjevi = svojstva.zajednicki_zahtjevi(profil)
@@ -82,19 +86,23 @@ def izradi_pdf(profil: Profil, studenti: Iterable[svojstva.StudentPopisa]) -> by
             pdf.multi_cell(0, VELICINA * 0.5, poruka("pdf.stavka", zahtjev=zahtjev), new_x="LMARGIN", new_y="NEXT")
         pdf.ln(RAZMAK)
 
-    _odlomak(pdf, poruka("pdf.tablica_naslov"), velicina=VELICINA_PODNASLOVA, podebljano=True)
-    _odlomak(pdf, poruka("pdf.tablica_opis"))
+    broj_stupaca = STUPACA_BEZ_MARGINA if fiksne else len(STUPCI)
+    stupci = STUPCI[:broj_stupaca]
+    _odlomak(pdf, poruka("pdf.tablica_naslov_fiksne" if fiksne else "pdf.tablica_naslov"),
+             velicina=VELICINA_PODNASLOVA, podebljano=True)
+    if not fiksne:
+        _odlomak(pdf, poruka("pdf.tablica_opis"))
     pdf.set_font(FONT, size=VELICINA_TABLICE)
     with pdf.table(
-        col_widths=SIRINE_STUPACA,
-        text_align=("RIGHT", "LEFT", "LEFT", "LEFT", "RIGHT", "RIGHT", "RIGHT", "RIGHT"),
+        col_widths=SIRINE_STUPACA[:broj_stupaca],
+        text_align=PORAVNANJE[:broj_stupaca],
         headings_style=FontFace(emphasis="BOLD"),
         repeat_headings=1,
         line_height=VELICINA_TABLICE * 0.5,
     ) as tablica:
-        tablica.row([poruka(f"pdf.stupac_{stupac}") for stupac in STUPCI])
+        tablica.row([poruka(f"pdf.stupac_{stupac}") for stupac in stupci])
         for redak in retci:
-            tablica.row([str(getattr(redak, stupac)) for stupac in STUPCI])
+            tablica.row([str(getattr(redak, stupac)) for stupac in stupci])
     return bytes(pdf.output())
 
 

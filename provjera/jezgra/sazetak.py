@@ -32,8 +32,8 @@ def html_sazetka(izvjestaj: Izvjestaj, naziv_vjezbe: str, vrijeme: str) -> str:
         if (status := status_pravila(izvjestaj.nalazi, pravilo_id)) is not None
     )
     ukupno = "sazetak.spremno" if spremnost(izvjestaj) else "sazetak.nije_spremno"
-    polja = (
-        ("sazetak.rbr", str(izvjestaj.rbr)),
+    # Uz fiksne margine student ne upisuje Rbr., pa ga sažetak ne navodi.
+    polja = (() if izvjestaj.rbr is None else (("sazetak.rbr", str(izvjestaj.rbr)),)) + (
         ("sazetak.vjezba", naziv_vjezbe),
         ("sazetak.verzija", izvjestaj.profil_verzija),
         ("sazetak.vrijeme", vrijeme),

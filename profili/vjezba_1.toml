@@ -25,6 +25,9 @@ korak = "0,1 cm"
 naslovnica = "2,5 cm"
 # Novo sjeme daje novi raspored margina za sljedeću vježbu.
 sjeme = 20261012
+# fiksne_margine = true: svi studenti dobivaju osnovice kao margine tijela, student ne
+# upisuje Rbr., a raspon, korak i sjeme smiju izostati. Zadano je false (individualne margine).
+# fiksne_margine = false
 
 [tolerancije]
 # Mora biti manja od pola koraka formule.

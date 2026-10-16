@@ -46,7 +46,7 @@ class PregledSpremnosti:
     verzija: str
     broj_aktivnih: int
     broj_ukljucenih_pravila: int
-    margine_jedinstvene: bool | None  # None: nema zamrznutog popisa
+    margine_jedinstvene: bool | None  # None: nema zamrznutog popisa ili su margine fiksne
     problemi: tuple[Problem, ...]
 
     @property
@@ -56,6 +56,40 @@ class PregledSpremnosti:
 
 def _popis_rbrova(rbrovi: Sequence[int]) -> str:
     return ", ".join(str(r) for r in rbrovi)
+
+
+def _individualne_margine(
+    profil: Profil, rbrovi: Sequence[int], dupli: bool, problemi: list[Problem]
+) -> bool | None:
+    """Raspon formule i jedinstvenost individualnih margina; problemi idu u ``problemi``."""
+    najveci = formula.najveci_rbr(profil.formula)
+    jedinstveni = sorted(set(rbrovi))
+    izvan = [r for r in jedinstveni if not 1 <= r <= najveci]
+    if izvan:
+        problemi.append(
+            Problem(
+                "spremnost.rbr_izvan_raspona",
+                {"rbrovi": _popis_rbrova(izvan), "najveci": najveci},
+            )
+        )
+    vidjene: dict[formula.Margine, int] = {}
+    jedinstvene = True
+    for rbr in jedinstveni:
+        if not 1 <= rbr <= najveci:
+            continue
+        margine = formula.margine(rbr, profil.formula)
+        if margine in vidjene:
+            jedinstvene = False
+            problemi.append(
+                Problem("spremnost.iste_margine", {"prvi": vidjene[margine], "drugi": rbr})
+            )
+        else:
+            vidjene[margine] = rbr
+    if dupli:
+        return False  # isti Rbr. dvaput znači iste margine
+    if not vidjene:
+        return None  # nijedan Rbr. nije provjeren
+    return jedinstvene
 
 
 def pregled(
@@ -70,6 +104,8 @@ def pregled(
 
     Jedinstvenost margina provjerava se za sve Rbr. na popisu (i neaktivne);
     Rbr. izvan raspona formule preskaču se jer su već prijavljeni kao problem.
+    Uz fiksne margine raspon i jedinstvenost se ne provjeravaju (``margine_jedinstvene``
+    ostaje ``None``); dupli Rbr. i dalje je problem.
     """
     problemi: list[Problem] = []
     margine_jedinstvene: bool | None = None
@@ -78,36 +114,11 @@ def pregled(
     else:
         if broj_aktivnih <= 0:
             problemi.append(Problem("spremnost.nema_aktivnih"))
-        najveci = formula.najveci_rbr(profil.formula)
-        jedinstveni = sorted(set(rbrovi))
         dupli = sorted(r for r, broj in Counter(rbrovi).items() if broj > 1)
         if dupli:
             problemi.append(Problem("spremnost.dupli_rbr", {"rbrovi": _popis_rbrova(dupli)}))
-        izvan = [r for r in jedinstveni if not 1 <= r <= najveci]
-        if izvan:
-            problemi.append(
-                Problem(
-                    "spremnost.rbr_izvan_raspona",
-                    {"rbrovi": _popis_rbrova(izvan), "najveci": najveci},
-                )
-            )
-        vidjene: dict[formula.Margine, int] = {}
-        margine_jedinstvene = True
-        for rbr in jedinstveni:
-            if not 1 <= rbr <= najveci:
-                continue
-            margine = formula.margine(rbr, profil.formula)
-            if margine in vidjene:
-                margine_jedinstvene = False
-                problemi.append(
-                    Problem("spremnost.iste_margine", {"prvi": vidjene[margine], "drugi": rbr})
-                )
-            else:
-                vidjene[margine] = rbr
-        if dupli:
-            margine_jedinstvene = False  # isti Rbr. dvaput znači iste margine
-        elif not vidjene:
-            margine_jedinstvene = None  # nijedan Rbr. nije provjeren
+        if not profil.formula.fiksne_margine:
+            margine_jedinstvene = _individualne_margine(profil, rbrovi, bool(dupli), problemi)
     ukljucenih = sum(p.ukljuceno for p in profil.pravila.values())
     if not ukljucenih:
         problemi.append(Problem("spremnost.nema_pravila"))

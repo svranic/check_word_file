@@ -31,24 +31,33 @@ class RedakSvojstava:
     ime: str
     prezime: str
     naziv: str
-    gore: str
-    dolje: str
-    lijevo: str
-    desno: str
+    # Individualne margine; ``None`` uz fiksne margine (navode se u zajedničkim zahtjevima).
+    gore: str | None = None
+    dolje: str | None = None
+    lijevo: str | None = None
+    desno: str | None = None
+
+
+def _margine_tijela(profil: Profil, rbr: int | None) -> dict[str, str]:
+    twips = formula.margine(rbr, profil.formula).u_twips()
+    return {strana: formatiraj(iznos, Jedinica.TWIPS) for strana, iznos in twips.items()}
 
 
 def retci(profil: Profil, studenti: Iterable[StudentPopisa]) -> tuple[RedakSvojstava, ...]:
-    """Jedan redak po aktivnom studentu, redom po Rbr.; neaktivni se izostavljaju."""
+    """Jedan redak po aktivnom studentu, redom po Rbr.; neaktivni se izostavljaju.
+
+    Uz fiksne margine redak nema margina: iste su za sve i idu u zajedničke zahtjeve.
+    """
+    fiksne = profil.formula.fiksne_margine
     rezultat = []
     for s in sorted((s for s in studenti if s.aktivan), key=lambda s: s.rbr):
-        twips = formula.margine(s.rbr, profil.formula).u_twips()
         rezultat.append(
             RedakSvojstava(
                 rbr=s.rbr,
                 ime=s.ime,
                 prezime=s.prezime,
                 naziv=naziv.kanonski(s.ime, s.prezime, profil),
-                **{strana: formatiraj(iznos, Jedinica.TWIPS) for strana, iznos in twips.items()},
+                **({} if fiksne else _margine_tijela(profil, s.rbr)),
             )
         )
     return tuple(rezultat)
@@ -58,7 +67,7 @@ def retci(profil: Profil, studenti: Iterable[StudentPopisa]) -> tuple[RedakSvojs
 _SVOJSTVA: dict[str, tuple[tuple[str, Jedinica], ...]] = {
     "R-NAZIV": (),
     "R-SEKCIJE": (),
-    "R-MARGINE": (),  # margine naslovnice; individualne su u tablici
+    "R-MARGINE": (),  # margine naslovnice (i tijela uz fiksne); individualne su u tablici
     "R-TEKST": (
         ("stil", Jedinica.TEKST),
         ("font", Jedinica.TEKST),
@@ -118,24 +127,43 @@ def _vrijednost(kljuc: str, iznos: object, jedinica: Jedinica) -> str:
     return formatiraj(iznos, jedinica)
 
 
-def zajednicki_zahtjevi(profil: Profil) -> tuple[str, ...]:
-    """Zahtjevi isti za sve studente; isključena pravila (i ona bez vrijednosti) se ne navode."""
+def _zahtjevi_margina(profil: Profil) -> list[str]:
+    """Margine naslovnice (navode se samo uz uključen R-MARGINE)."""
     zahtjevi = []
+    fiksne = profil.formula.fiksne_margine
+    naslovnica = formatiraj(jedinice.mm_u_twips(profil.formula.naslovnica), Jedinica.TWIPS)
+    opis = "pdf.opis.naslovnica_fiksne" if fiksne else "pdf.opis.naslovnica"
+    zahtjevi.append(
+        poruka(
+            "pdf.zahtjev",
+            naziv=poruka("pdf.naslovnica"),
+            svojstva=poruka(opis, naslovnica=naslovnica),
+        )
+    )
+    return zahtjevi
+
+
+def zajednicki_zahtjevi(profil: Profil) -> tuple[str, ...]:
+    """Zahtjevi isti za sve studente; isključena pravila (i ona bez vrijednosti) se ne navode.
+
+    Uz fiksne margine margine tijela navode se uvijek, kao što ih tablica u individualnom
+    načinu uvijek ima, neovisno o uključenosti R-MARGINE.
+    """
+    zahtjevi = []
+    if profil.formula.fiksne_margine:
+        zahtjevi.append(
+            poruka(
+                "pdf.zahtjev",
+                naziv=poruka("pdf.margine_tijela"),
+                svojstva=poruka("pdf.opis.margine_tijela", **_margine_tijela(profil, None)),
+            )
+        )
     for pravilo_id, svojstva in _SVOJSTVA.items():
         postavke = profil.pravila.get(pravilo_id)
         if postavke is None or not postavke.ukljuceno:
             continue
         if pravilo_id == "R-MARGINE":
-            naslovnica = formatiraj(
-                jedinice.mm_u_twips(profil.formula.naslovnica), Jedinica.TWIPS
-            )
-            zahtjevi.append(
-                poruka(
-                    "pdf.zahtjev",
-                    naziv=poruka("pdf.naslovnica"),
-                    svojstva=poruka("pdf.opis.naslovnica", naslovnica=naslovnica),
-                )
-            )
+            zahtjevi += _zahtjevi_margina(profil)
             continue
         dijelovi = (
             [poruka(_OPIS[pravilo_id], obrazac=profil.naziv_datoteke.obrazac)]
