@@ -40,6 +40,8 @@ from provjera.jezgra.poruke import poruka
 KORIJEN = Path(__file__).resolve().parents[1]
 NASTAVNIK = str(KORIJEN / "apps" / "nastavnik.py")
 VJEZBA_1 = KORIJEN / "profili" / "vjezba_1.toml"
+# Vježba 1 s individualnim marginama, za testove koji ovise o formuli margina.
+BASELINE = KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml"
 
 
 @pytest.fixture(autouse=True)
@@ -611,15 +613,19 @@ def test_spremnost_spremno(podaci, aplikacija):
     assert poruka("spremnost.aktivnih", broj=78) in tekst
     ukljucenih = sum(p.ukljuceno for p in vjezba.pravila.values())
     assert poruka("spremnost.pravila", broj=ukljucenih, ukupno=len(vjezba.pravila)) in tekst
-    assert "✅ " + poruka("spremnost.margine_jedinstvene") in tekst
+    if vjezba.formula.fiksne_margine:
+        assert poruka("spremnost.margine_fiksne") in tekst
+    else:
+        assert "✅ " + poruka("spremnost.margine_jedinstvene") in tekst
     [status] = [s for s in at.success if s.value == poruka("spremnost.spremno")]
     assert status.icon == "✅"
     assert not at.error
     assert not at.warning
 
 
-def test_spremnost_bez_popisa(u_mapi):
-    at = u_mapi
+def test_spremnost_bez_popisa(monkeypatch, aplikacija, podaci):
+    _profili(monkeypatch, [("vjezba_1.toml", BASELINE.read_bytes())])
+    at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
     [status] = at.warning
     assert status.value == poruka("spremnost.nije_spremno", broj=2)
     assert status.icon == "❌"
@@ -630,8 +636,9 @@ def test_spremnost_bez_popisa(u_mapi):
     assert not at.error  # „nije spremno“ je upozorenje, ne greška
 
 
-def test_spremnost_prevelik_rbr(podaci, aplikacija):
-    najveci = formula.najveci_rbr(profil.ucitaj(VJEZBA_1.read_bytes()).formula)
+def test_spremnost_prevelik_rbr(monkeypatch, podaci, aplikacija):
+    _profili(monkeypatch, [("vjezba_1.toml", BASELINE.read_bytes())])
+    najveci = formula.najveci_rbr(profil.ucitaj(BASELINE.read_bytes()).formula)
     spremi(_sintetski_popis([1, 2, najveci + 1]), _popis_csv(podaci))
     at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
     assert not at.exception
@@ -658,8 +665,9 @@ def test_spremnost_sva_pravila_iskljucena(podaci, monkeypatch):
     assert "- " + poruka("spremnost.nema_pravila") in _tekst(at)
 
 
-def test_spremnost_neaktivni_rbr_izvan_raspona(podaci, aplikacija):
-    najveci = formula.najveci_rbr(profil.ucitaj(VJEZBA_1.read_bytes()).formula)
+def test_spremnost_neaktivni_rbr_izvan_raspona(monkeypatch, podaci, aplikacija):
+    _profili(monkeypatch, [("vjezba_1.toml", BASELINE.read_bytes())])
+    najveci = formula.najveci_rbr(profil.ucitaj(BASELINE.read_bytes()).formula)
     studenti = _sintetski_popis([1]) + _sintetski_popis([najveci + 1], aktivan=False)
     spremi(studenti, _popis_csv(podaci))
     at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()
@@ -1045,7 +1053,7 @@ def test_pdf_prikazuje_zadnje_izdano(podaci, aplikacija):
 
 def test_pdf_izdano_za_drugi_profil_upozorava(podaci, aplikacija):
     drugi = profil.ucitaj(
-        _zamijeni(VJEZBA_1.read_bytes(), b"sjeme = 20261012", b"sjeme = 1")
+        _zamijeni(VJEZBA_1.read_bytes(), b'osnovica_gore = "2,5 cm"', b'osnovica_gore = "2,6 cm"')
     )
     zapisi_izdano(_mapa_vjezbe(podaci), drugi, datetime(2026, 10, 1, 9, 5, tzinfo=ZONA))
     at = aplikacija.text_input(key="podatkovna_mapa").input(str(podaci)).run()

@@ -10,7 +10,7 @@ from provjera.jezgra.samoprovjera import NemaSkupa, RezultatPrimjera, StatusPrim
 from provjera.jezgra.spremnost import Problem
 
 KORIJEN = Path(__file__).resolve().parents[1]
-VJEZBA_1 = KORIJEN / "profili" / "vjezba_1.toml"
+VJEZBA_1 = KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml"
 
 
 @pytest.fixture(scope="module")

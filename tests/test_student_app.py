@@ -1,5 +1,6 @@
 import logging
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,20 @@ STUDENT = str(KORIJEN / "apps" / "student.py")
 ISPRAVAN_NAZIV = "Lucija_Šimek_GiG_OG_Vjezba_1.docx"
 
 
+@pytest.fixture(autouse=True)
+def _individualni_profil(tmp_path_factory, monkeypatch):
+    """Aplikacija se pokreće iz kopije čija mapa profila ima Vježbu 1 s individualnim
+    marginama; živi ``profili/vjezba_1.toml`` smije prijeći na fiksne margine."""
+    korijen = tmp_path_factory.mktemp("student_app")
+    (korijen / "apps").mkdir()
+    (korijen / "apps" / "student.py").write_bytes((KORIJEN / "apps" / "student.py").read_bytes())
+    (korijen / "profili").mkdir()
+    (korijen / "profili" / "vjezba_1.toml").write_bytes(
+        (KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml").read_bytes()
+    )
+    monkeypatch.setattr(sys.modules[__name__], "STUDENT", str(korijen / "apps" / "student.py"))
+
+
 @pytest.fixture
 def aplikacija():
     return AppTest.from_file(STUDENT).run()
@@ -40,7 +55,7 @@ def _posalji(at: AppTest, unos: str) -> AppTest:
 def test_ispravan_rbr_prikazuje_margine_i_obrazac(aplikacija):
     at = _posalji(aplikacija, "54.")
     assert not at.exception
-    p = profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes())
+    p = profil.ucitaj((KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml").read_bytes())
     ocekivane = formula.margine(54, p.formula).u_twips()
     assert [(m.label, m.value) for m in at.metric] == [
         (poruka(f"margine.{s}"), formatiraj(ocekivane[s], Jedinica.TWIPS))
@@ -66,7 +81,7 @@ def test_neispravan_rbr_prikazuje_poruku(aplikacija, unos, kljuc):
 
 def test_prevelik_rbr(aplikacija):
     at = _posalji(aplikacija, "99999")
-    p = profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes())
+    p = profil.ucitaj((KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml").read_bytes())
     najveci = formula.najveci_rbr(p.formula)
     assert [e.value for e in at.error] == [poruka("rbr.prevelik", rbr=99999, najveci=najveci)]
     assert not at.metric
@@ -89,7 +104,7 @@ def test_isti_rbr_ne_brise_provjeru(aplikacija):
 
 
 def test_promjena_vjezbe_brise_provjeru(monkeypatch):
-    p = profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes())
+    p = profil.ucitaj((KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml").read_bytes())
     druga = p.model_copy(
         update={"vjezba": p.vjezba.model_copy(update={"id": "vjezba_2", "naziv": "Vježba 2"})}
     )
@@ -108,7 +123,7 @@ def test_neispravan_profil_daje_neutralnu_poruku(monkeypatch):
 
 
 def test_djelomicno_neispravni_profili(monkeypatch):
-    p = profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes())
+    p = profil.ucitaj((KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml").read_bytes())
     monkeypatch.setattr(profil, "objavljeni", lambda _sadrzaji: ([p], 1))
     at = AppTest.from_file(STUDENT).run()
     assert [w.value for w in at.warning] == [poruka("profil.djelomicno_nedostupno")]
@@ -121,7 +136,7 @@ def test_djelomicno_neispravni_profili(monkeypatch):
 
 def _docx() -> bytes:
     """Ispravan sintetski rad za Rbr. 54 (naslovnica + tijelo, A4)."""
-    return ispravan(54, profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes()))
+    return ispravan(54, profil.ucitaj((KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml").read_bytes()))
 
 
 def _ucitaj(at: AppTest, naziv: str, sadrzaj: bytes) -> AppTest:
@@ -393,7 +408,7 @@ def test_greska_sazetka_ne_prikazuje_gresku_provjere(monkeypatch):
 
 
 def test_margine_i_naziv_dolaze_iz_odabrane_vjezbe(monkeypatch):
-    p = profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes())
+    p = profil.ucitaj((KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml").read_bytes())
     druga = p.model_copy(
         update={
             "vjezba": p.vjezba.model_copy(update={"id": "vjezba_2", "naziv": "Vježba 2"}),
@@ -441,7 +456,7 @@ def test_gumb_za_sazetak_salje_html_s_nazivom_i_vrstom(monkeypatch, aplikacija):
 
     monkeypatch.setattr(streamlit, "download_button", spijun)
     at = _posalji(aplikacija, "54")
-    datoteka = ispravan(54, profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes()))
+    datoteka = ispravan(54, profil.ucitaj((KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml").read_bytes()))
     at = _ucitaj(at, "Ana_Horvat_GiG_OG_Vjezba_1.docx", datoteka)
     assert pozivi, "gumb za sažetak nije prikazan"
     poziv = pozivi[-1]

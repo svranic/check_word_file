@@ -12,7 +12,7 @@ from provjera.jezgra import formula, naziv, profil, svojstva
 from provjera.jezgra.jedinice import Jedinica
 from provjera.jezgra.poruke import formatiraj, poruka
 
-VJEZBA_1 = Path(__file__).resolve().parents[1] / "profili" / "vjezba_1.toml"
+VJEZBA_1 = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "vjezba_1_baseline.toml"
 
 
 @pytest.fixture(scope="module")

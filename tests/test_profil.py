@@ -4,7 +4,7 @@ import pytest
 
 from provjera.jezgra import profil
 
-PROFIL_VJEZBE_1 = Path(__file__).resolve().parents[1] / "profili" / "vjezba_1.toml"
+PROFIL_VJEZBE_1 = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "vjezba_1_baseline.toml"
 
 
 def _vjezba_1() -> str:

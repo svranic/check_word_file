@@ -11,7 +11,7 @@ SNAPSHOT = KORIJEN / "tests" / "snapshot" / "formula_vjezba_1.json"
 
 @pytest.fixture(scope="module")
 def parametri():
-    return profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes()).formula
+    return profil.ucitaj((KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml").read_bytes()).formula
 
 
 def _sve(parametri, do=500):

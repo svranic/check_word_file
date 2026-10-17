@@ -27,7 +27,7 @@ naslovnica = "2,5 cm"
 sjeme = 20261012
 # fiksne_margine = true: svi studenti dobivaju osnovice kao margine tijela, student ne
 # upisuje Rbr., a raspon, korak i sjeme smiju izostati. Zadano je false (individualne margine).
-# fiksne_margine = false
+fiksne_margine = true
 
 [tolerancije]
 # Mora biti manja od pola koraka formule.

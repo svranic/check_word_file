@@ -16,7 +16,7 @@ from provjera.jezgra.provjera import provjeri
 from provjera.jezgra.ulaz import RazlogOdbijanja
 
 KORIJEN = Path(__file__).resolve().parents[1]
-PROFIL = profil.ucitaj((KORIJEN / "profili" / "vjezba_1.toml").read_bytes())
+PROFIL = profil.ucitaj((KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml").read_bytes())
 KONTEKST = KontekstProvjere("Ana_Horvat_GiG_OG_Vjezba_1.docx", 54, None, None)
 
 

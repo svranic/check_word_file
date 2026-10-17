@@ -21,7 +21,7 @@ from provjera.jezgra.samoprovjera import usporedi
 from provjera.jezgra.sazetak import html_sazetka
 
 KORIJEN = Path(__file__).resolve().parents[1]
-VJEZBA_1 = KORIJEN / "profili" / "vjezba_1.toml"
+VJEZBA_1 = KORIJEN / "tests" / "fixtures" / "vjezba_1_baseline.toml"
 STUDENT = str(KORIJEN / "apps" / "student.py")
 NASTAVNIK = str(KORIJEN / "apps" / "nastavnik.py")
 # Zamrznuta kopija profila Vježbe 1 iz commita b1e4d52 (prije uvođenja zastavice).
