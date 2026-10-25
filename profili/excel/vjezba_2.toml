@@ -1,0 +1,29 @@
+# Profil Excel vježbe (trigonometrijski obrasci). Bez osobnih podataka.
+
+[vjezba]
+id = "vjezba_2"
+naziv = "Vježba 2 – Računanje trokuta"
+
+[naziv_datoteke]
+sufiks = "_GiG_OG_Vjezba_2"
+nastavak = ".xlsx"
+
+[zadaci]
+# Svaki zadatak je zaseban list: "sinus", "kosinus", "tangens".
+vrste = ["sinus", "kosinus", "tangens"]
+# Koje zadatke rješava student:
+#   "svi"       – sve zadatke iz vrste
+#   "redom"     – po redoslijedu ISVU popisa: 1. student sinus, 2. kosinus, 3. tangens, 4. sinus…
+#                 (zadatak se upisuje u osobni predložak, pa kasnija promjena popisa ne smeta)
+#   "nasumicno" – jedan zadatak prema JMBAG-u i sjemenu (ne ovisi o popisu)
+raspodjela = "redom"
+# Točnost mjerenja kutova u sekundama: mjerene sekunde su 0, 10, 20… Odstupanje fβ tada
+# najčešće nije djeljivo s 3 pa ga student raspoređuje na kutove u cijelim sekundama.
+korak_mjerenja = 10
+# Novo sjeme daje nove osobne ulazne podatke (npr. za sljedeću generaciju).
+sjeme = 20261024
+# true: svaki student dobiva predložak s vlastitim, zaključanim ulaznim podacima.
+osobni_podaci = true
+# Lozinka zaštite listova; profil je u gitu, pa je ovdje ostavi praznu i zadaj je
+# s --lozinka (ili je naredba generira i zapiše u izlaznu mapu).
+lozinka = ""

@@ -10,11 +10,17 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from provjera.jezgra.poruke import KATALOG, poruka
+from provjera.word.jezgra.poruke import KATALOG, poruka
 
 KORIJEN = Path(__file__).resolve().parents[1]
-JEZGRA = KORIJEN / "provjera" / "jezgra"
+JEZGRA = KORIJEN / "provjera" / "word" / "jezgra"
 APPS = KORIJEN / "apps"
+# Čisti paketi (AD-1) i ono što svaki od njih dodatno ne smije uvoziti.
+CISTI_PAKETI = {
+    JEZGRA: {"provjera.excel"},
+    KORIJEN / "provjera" / "excel" / "jezgra": {"provjera.word", "provjera.excel.adapteri"},
+    KORIJEN / "provjera" / "zajednicko": {"provjera.word", "provjera.excel"},
+}
 
 ZABRANJENI_UVOZI_JEZGRE = {
     "streamlit",
@@ -23,19 +29,19 @@ ZABRANJENI_UVOZI_JEZGRE = {
     "time",
     "logging.config",
     "logging.basicConfig",
-    "provjera.adapteri",
+    "provjera.word.adapteri",
 }
 ZABRANJENI_POZIVI_SATA = {"now", "utcnow", "today"}
-ZABRANJENI_MODULI_STUDENTA = ("provjera.adapteri", "openpyxl", "fpdf")
+ZABRANJENI_MODULI_STUDENTA = ("provjera.word.adapteri", "openpyxl", "fpdf")
 OSOBNI_NASTAVCI = (".xlsx", ".xls", ".xlsm", ".csv", ".docx", ".doc", ".pdf")
 
 
 # --- AD-1: jezgra ne uvozi zabranjeno i ne čita sat -------------------------
 
 
-def _zabranjen(modul: str) -> bool:
+def _zabranjen(modul: str, dodatno: frozenset[str] = frozenset()) -> bool:
     return any(
-        modul == z or modul.startswith(z + ".") for z in ZABRANJENI_UVOZI_JEZGRE
+        modul == z or modul.startswith(z + ".") for z in ZABRANJENI_UVOZI_JEZGRE | dodatno
     )
 
 
@@ -48,7 +54,7 @@ def _apsolutni_modul(cvor: ast.ImportFrom, paket: str) -> str:
 
 
 def prekrsaji_jezgre(
-    izvor: str, naziv: str, paket: str = "provjera.jezgra"
+    izvor: str, naziv: str, paket: str = "provjera.word.jezgra", dodatno: frozenset[str] = frozenset()
 ) -> list[str]:
     """Vraća popis kršenja AD-1 u izvornom kodu jednog modula jezgre."""
     prekrsaji = []
@@ -61,7 +67,7 @@ def prekrsaji_jezgre(
         else:
             moduli = []
         for modul in moduli:
-            if _zabranjen(modul):
+            if _zabranjen(modul, dodatno):
                 prekrsaji.append(f"{naziv}:{cvor.lineno}: uvoz {modul}")
                 break
         if (
@@ -73,15 +79,22 @@ def prekrsaji_jezgre(
     return prekrsaji
 
 
-def test_jezgra_ne_krsi_ad1():
+@pytest.mark.parametrize("mapa", list(CISTI_PAKETI), ids=lambda m: m.relative_to(KORIJEN).as_posix())
+def test_jezgra_ne_krsi_ad1(mapa):
     prekrsaji = []
-    for datoteka in sorted(JEZGRA.rglob("*.py")):
+    for datoteka in sorted(mapa.rglob("*.py")):
         relativno = datoteka.relative_to(KORIJEN)
         paket = ".".join(relativno.parent.parts)  # i za __init__.py i za modul
         prekrsaji += prekrsaji_jezgre(
-            datoteka.read_text(encoding="utf-8"), relativno.as_posix(), paket
+            datoteka.read_text(encoding="utf-8"), relativno.as_posix(), paket,
+            frozenset(CISTI_PAKETI[mapa]),
         )
     assert prekrsaji == []
+
+
+def test_excel_jezgra_ne_smije_uvoziti_word():
+    izvor = "from provjera.word.jezgra import model"
+    assert prekrsaji_jezgre(izvor, "x.py", "provjera.excel.jezgra", frozenset({"provjera.word"}))
 
 
 @pytest.mark.parametrize(
@@ -99,7 +112,7 @@ def test_jezgra_ne_krsi_ad1():
         "import datetime\nx = datetime.datetime.utcnow()",
         "import logging\nlogging.basicConfig()",
         "from logging import basicConfig",
-        "from provjera.adapteri import popis",
+        "from provjera.word.adapteri import popis",
         "from ..adapteri import popis",
         "from .. import adapteri",
     ],

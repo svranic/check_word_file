@@ -9,22 +9,30 @@ from zoneinfo import ZoneInfo
 
 import streamlit as st
 
-from provjera.jezgra import formula, profil, rbr, ulaz
-from provjera.jezgra.jedinice import Jedinica, mm_u_twips
-from provjera.jezgra.nalaz import Izvjestaj, KontekstProvjere, Nalaz, Status
-from provjera.jezgra.poruke import (
+from provjera.word.jezgra import formula, profil, rbr
+from provjera.zajednicko import ulaz
+from provjera.word.jezgra.jedinice import Jedinica, mm_u_twips
+from provjera.word.jezgra.nalaz import Izvjestaj, KontekstProvjere, Nalaz, Status
+from provjera.word.jezgra.poruke import (
     formatiraj,
     opis_izvora,
     opis_lokacije,
     poruka,
     tekst_nalaza,
 )
-from provjera.jezgra.provjera import NAJVISE_PRIMJERA, provjeri, spremnost
-from provjera.jezgra.sazetak import html_sazetka
+from provjera.word.jezgra.provjera import NAJVISE_PRIMJERA, provjeri, spremnost
+from provjera.word.jezgra.sazetak import html_sazetka
+from provjera.excel.jezgra import profil as profil_excel
+from provjera.excel.jezgra.provjera import IzvjestajExcel, Stavka
+from provjera.excel.jezgra.zadaci import ZADACI
+from provjera.excel.jezgra.provjera import provjeri as provjeri_excel
 
-MAPA_PROFILA = Path(__file__).resolve().parents[1] / "profili"
+MAPA_PROFILA = Path(__file__).resolve().parents[1] / "profili" / "word"
+MAPA_PROFILA_EXCEL = Path(__file__).resolve().parents[1] / "profili" / "excel"
+# Excel vježbe u izborniku imaju ovaj prefiks, da se id ne sudari s Word vježbom.
+PREFIKS_EXCEL = "excel:"
 # Stanje vezano uz jednu provjeru; briše se pri promjeni Rbr. ili vježbe (FR-9).
-KLJUCEVI_PROVJERE = ("izvjestaj", "greska_provjere", "vrijeme_provjere")
+KLJUCEVI_PROVJERE = ("izvjestaj", "greska_provjere", "vrijeme_provjere", "izvjestaj_excel")
 VREMENSKA_ZONA = ZoneInfo("Europe/Zagreb")
 # FR-11: redoslijed grupa nalaza u izvještaju.
 REDOSLIJED_GRUPA = (Status.NE_PROLAZI, Status.NEPROVJERLJIVO, Status.PROSLO)
@@ -177,6 +185,92 @@ def prikazi_izvjestaj(izvjestaj: Izvjestaj) -> None:
     st.caption(poruka("izvjestaj.verzija_profila", verzija=izvjestaj.profil_verzija))
 
 
+def ucitaj_excel(odabrani: profil_excel.ProfilExcel) -> None:
+    st.write(poruka("excel.uputa"))
+    st.write(poruka("naziv.obrazac", obrazac=odabrani.naziv_datoteke.obrazac))
+    datoteka = st.file_uploader(
+        poruka("excel.oznaka"),
+        key=f"excel_{st.session_state.get('polje_ucitavanja', 0)}",
+        max_upload_size=ulaz.NAJVECA_VELICINA_MB + 1,
+    )
+    if datoteka is not None:
+        for kljuc in KLJUCEVI_PROVJERE:
+            st.session_state.pop(kljuc, None)
+        try:
+            st.session_state["izvjestaj_excel"] = provjeri_excel(datoteka.name, datoteka.getvalue(), odabrani)
+        except MemoryError:
+            st.session_state["greska_provjere"] = "izvjestaj.preopterecenje"
+        except Exception:  # noqa: BLE001 — student nikad ne vidi traceback
+            st.session_state["greska_provjere"] = "izvjestaj.greska"
+        novo_polje_za_ucitavanje()
+        st.rerun()
+
+    if st.session_state.get("greska_provjere"):
+        st.error(poruka(st.session_state["greska_provjere"]), icon="❌")
+    elif st.session_state.get("izvjestaj_excel") is not None:
+        try:
+            prikazi_izvjestaj_excel(st.session_state["izvjestaj_excel"])
+        except Exception:  # noqa: BLE001 — student nikad ne vidi traceback
+            st.error(poruka("izvjestaj.greska"), icon="❌")
+
+
+def prikazi_izvjestaj_excel(izvjestaj: IzvjestajExcel) -> None:
+    if izvjestaj.odbijeno is not None:
+        razlog = izvjestaj.odbijeno
+        st.error(poruka(f"excel.ulaz.{razlog}", mb=VELICINA_PO_RAZLOGU.get(razlog, 0)), icon="❌")
+        return
+    if izvjestaj.status is Status.PROSLO:
+        st.success(poruka("excel.spremno"), icon="✅")
+    elif izvjestaj.status is Status.NE_PROLAZI:
+        st.error(poruka("excel.nije_spremno"), icon="❌")
+    else:
+        st.warning(poruka("excel.neprovjerljivo"), icon="⚠️")
+    st.caption(poruka(
+        "excel.sazetak",
+        proslo=izvjestaj.broj(Status.PROSLO),
+        ne_prolazi=izvjestaj.broj(Status.NE_PROLAZI),
+        neprovjerljivo=izvjestaj.broj(Status.NEPROVJERLJIVO),
+    ))
+    for status in REDOSLIJED_GRUPA:
+        grupa = [s for s in izvjestaj.stavke if s.status is status]
+        if not grupa:
+            continue
+        st.subheader(poruka(f"izvjestaj.grupa.{status.value}"))
+        for stavka in grupa:
+            prikazi_stavku_excel(stavka)
+
+
+def prikazi_stavku_excel(stavka: Stavka) -> None:
+    mjesto = [ZADACI[stavka.zadatak].naziv] if stavka.zadatak else []
+    mjesto += [stavka.adresa] if stavka.adresa else []
+    with st.container(border=True):
+        st.markdown(
+            f"**{poruka(f'excel.status.{stavka.status.value}')} {bez_markdowna(stavka.opis)}**"
+            + "".join(f" · {bez_markdowna(m)}" for m in mjesto)
+        )
+        for tekst in stavka.poruke:
+            st.markdown(bez_markdowna(tekst))
+
+
+def _excel_profili() -> tuple[list[profil_excel.ProfilExcel], int]:
+    """Objavljeni Excel profili i broj neispravnih (mapa smije i ne postojati)."""
+    profili, neispravnih, ids = [], 0, set()
+    for datoteka in sorted(MAPA_PROFILA_EXCEL.glob("*.toml")):
+        try:
+            p = profil_excel.ucitaj(_procitaj_profil(datoteka))
+        except profil_excel.GreskaProfila:
+            neispravnih += 1
+            continue
+        if not p.vjezba.objavljeno:
+            continue
+        if p.vjezba.id in ids:
+            neispravnih += 1
+            continue
+        ids.add(p.vjezba.id)
+        profili.append(p)
+    return profili, neispravnih
+
+
 st.set_page_config(page_title=poruka("app.naslov"), page_icon="📄")
 
 st.title(poruka("app.naslov"))
@@ -194,13 +288,15 @@ def _procitaj_profil(datoteka: Path) -> bytes:
 profili, neispravnih = profil.objavljeni(
     _procitaj_profil(datoteka) for datoteka in sorted(MAPA_PROFILA.glob("*.toml"))
 )
-if not profili:
+profili_excel, neispravnih_excel = _excel_profili()
+if not profili and not profili_excel:
     st.warning(poruka("profil.nedostupno"))
     st.stop()
-if neispravnih:
+if neispravnih or neispravnih_excel:
     st.warning(poruka("profil.djelomicno_nedostupno"))
 
-po_id = {p.vjezba.id: p for p in profili}
+po_id: dict[str, profil.Profil | profil_excel.ProfilExcel] = {p.vjezba.id: p for p in profili}
+po_id |= {PREFIKS_EXCEL + p.vjezba.id: p for p in profili_excel}
 id_vjezbe = st.selectbox(
     poruka("vjezba.odabir"),
     list(po_id),
@@ -209,6 +305,10 @@ id_vjezbe = st.selectbox(
     on_change=ocisti_provjeru,
 )
 odabrani = po_id[id_vjezbe]
+
+if isinstance(odabrani, profil_excel.ProfilExcel):
+    ucitaj_excel(odabrani)
+    st.stop()
 
 if odabrani.formula.fiksne_margine:
     # Iste margine za sve studente: Rbr. nije potreban, odmah se nudi učitavanje.

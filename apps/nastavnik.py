@@ -8,9 +8,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from provjera.adapteri import batch, excel_izlaz
-from provjera.adapteri.pdf_svojstva import izradi_pdf, spremi_pdf
-from provjera.adapteri.popis import (
+from provjera.word.adapteri import batch, excel_izlaz
+from provjera.word.adapteri.pdf_svojstva import izradi_pdf, spremi_pdf
+from provjera.word.adapteri.popis import (
     ZONA,
     GreskaIzdanog,
     GreskaRetka,
@@ -33,10 +33,10 @@ from provjera.adapteri.popis import (
     zapisi_atomski,
     zapisi_izdano,
 )
-from provjera.adapteri.samoprovjera import GreskaReferentnog, otisak_skupa
-from provjera.adapteri.samoprovjera import pokreni as pokreni_samoprovjeru
-from provjera.jezgra import formula, profil, spremnost, zbirna
-from provjera.jezgra.predaje import (
+from provjera.word.adapteri.samoprovjera import GreskaReferentnog, otisak_skupa
+from provjera.word.adapteri.samoprovjera import pokreni as pokreni_samoprovjeru
+from provjera.word.jezgra import formula, profil, spremnost, zbirna
+from provjera.word.jezgra.predaje import (
     RezultatBatcha,
     opis_kandidata,
     opis_nacina,
@@ -44,8 +44,8 @@ from provjera.jezgra.predaje import (
     opis_statusa,
     opis_studenta,
 )
-from provjera.jezgra.poruke import poruka
-from provjera.jezgra.samoprovjera import (
+from provjera.word.jezgra.poruke import poruka
+from provjera.word.jezgra.samoprovjera import (
     NemaSkupa,
     RezultatPrimjera,
     StatusPrimjera,
@@ -56,8 +56,8 @@ from provjera.jezgra.samoprovjera import (
 log = logging.getLogger(__name__)
 
 KORIJEN = Path(__file__).resolve().parents[1]
-MAPA_PROFILA = KORIJEN / "profili"
-MAPA_REFERENTNOG = KORIJEN / "tests" / "referentni"
+MAPA_PROFILA = KORIJEN / "profili" / "word"
+MAPA_REFERENTNOG = KORIJEN / "tests" / "word" / "referentni"
 ZADANA_MAPA = Path.home() / "ProvjeraWord"
 
 
